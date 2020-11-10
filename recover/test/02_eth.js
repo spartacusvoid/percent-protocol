@@ -115,7 +115,7 @@ describe("Recovery", function() {
     tx = await new_pETH.setInitialParameters();
     await tx.wait();
 
-    tx = await comptroller._replaceMarket(new_pETH.address, c.BRICKED_PETH_ADDRESS)
+    tx = await comptroller._replaceMarket(new_pETH.address, c.BRICKED_PETH_ADDRESS, [])
     await tx.wait();
     // tx = await comptroller._supportMarket(new_pETH.address);
     tx = await comptroller._setMintPaused(new_pETH.address, true);

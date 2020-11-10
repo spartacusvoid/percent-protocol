@@ -38,7 +38,7 @@ describe("pUsdc", function() {
   it("Can replace markets in comptroller", async function(){
     // const pUSDC_bricked = await hre.ethers.getContractAt("CTokenInterface", BRICKED_PUSDC_ADDRESS);
     const comptroller = await hre.ethers.getContractAt("InsolventComptroller", c.UNITROLLER_ADDRESS, timelockSigner);
-    tx = await comptroller._replaceMarket(pUsdc.address, c.BRICKED_PUSDC_ADDRESS)
+    tx = await comptroller._replaceMarket(pUsdc.address, c.BRICKED_PUSDC_ADDRESS, c.BRICKED_PUSDC_HOLDERS.concat(c.BRICKED_PUSDC_BORROWERS))
     await tx.wait()
 
     const newMarket = await comptroller.markets(pUsdc.address)

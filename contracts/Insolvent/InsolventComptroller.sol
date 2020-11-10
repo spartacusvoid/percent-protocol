@@ -1029,7 +1029,7 @@ contract InsolventComptroller is ComptrollerV3Storage, ComptrollerInterface, Com
       * @param cTokenOut The address of the market (token) to replace
       * @return uint 0=success, otherwise a failure. (See enum Error for details)
       */
-    function _replaceMarket(CToken cTokenIn, CToken cTokenOut) external returns (uint) {
+    function _replaceMarket(CToken cTokenIn, CToken cTokenOut, address[] calldata accounts) external returns (uint) {
         if (msg.sender != admin) {
             return fail(Error.UNAUTHORIZED, FailureInfo.SUPPORT_MARKET_OWNER_CHECK);
         }
@@ -1054,7 +1054,7 @@ contract InsolventComptroller is ComptrollerV3Storage, ComptrollerInterface, Com
 
         bool set;
         uint marketOutIdx;
-        for (uint i = 0; i < allMarkets.length; i ++) {
+        for (uint i=0;i<allMarkets.length;i++) {
             require(allMarkets[i] != CToken(cTokenIn), "market already added");
             if(allMarkets[i] == CToken(cTokenOut)){
                 marketOutIdx = i;
@@ -1065,6 +1065,10 @@ contract InsolventComptroller is ComptrollerV3Storage, ComptrollerInterface, Com
         require(set, "Market not found");
         allMarkets[marketOutIdx] = CToken(cTokenIn);
         delete markets[address(cTokenOut)];
+
+        for (uint i=0;i<accounts.length;i++) {
+            // replace in accountAssets for each account
+        }
 
         emit MarketListed(cTokenIn);
 
