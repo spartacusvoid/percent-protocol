@@ -1021,40 +1021,52 @@ contract InsolventComptroller is ComptrollerV3Storage, ComptrollerInterface, Com
         allMarkets.push(CToken(cToken));
     }
 
+
     /**
-      * @notice Drop the market from the markets mapping and set it as unlisted
-      * @dev Admin function to set isUnlisted and drop support for the market
-      * @param cToken The address of the market (token) to list
+      * @notice Replace markets
+      * @dev Admin function to swap markets
+      * @param cTokenIn The address of the market (token) to list
+      * @param cTokenOut The address of the market (token) to replace
       * @return uint 0=success, otherwise a failure. (See enum Error for details)
       */
-    function _dropMarket(CToken cToken) external returns (uint) {
+    function _replaceMarket(CToken cTokenIn, CToken cTokenOut) external returns (uint) {
         if (msg.sender != admin) {
             return fail(Error.UNAUTHORIZED, FailureInfo.SUPPORT_MARKET_OWNER_CHECK);
         }
 
-        if (!markets[address(cToken)].isListed) {
+        if (markets[address(cTokenIn)].isListed) {
+            return fail(Error.MARKET_ALREADY_LISTED, FailureInfo.SUPPORT_MARKET_EXISTS);
+        }
+
+        cTokenIn.isCToken(); // Sanity check to make sure its really a CToken
+
+        Market memory marketOut = markets[address(cTokenOut)];
+
+        if (!marketOut.isListed) {
             return fail(Error.MARKET_NOT_LISTED, FailureInfo.SUPPORT_MARKET_EXISTS);
         }
 
-        cToken.isCToken(); // Sanity check to make sure its really a CToken
-
-        /* markets[address(cToken)] = Market({isListed: true, isComped: false, collateralFactorMantissa: 0}); */
+        markets[address(cTokenIn)] = Market({
+          isListed: true,
+          isComped: markets[address(cTokenOut)].isComped,
+          collateralFactorMantissa: markets[address(cTokenOut)].collateralFactorMantissa
+        });
 
         bool set;
-        uint marketIdx;
+        uint marketOutIdx;
         for (uint i = 0; i < allMarkets.length; i ++) {
-            if(allMarkets[i] == CToken(cToken)){
-                marketIdx = i;
+            require(allMarkets[i] != CToken(cTokenIn), "market already added");
+            if(allMarkets[i] == CToken(cTokenOut)){
+                marketOutIdx = i;
                 set = true;
             }
         }
-        require(set, "Market not found");
-        // fill gap by replacing with last market and trimming array
-        allMarkets[marketIdx] = allMarkets[allMarkets.length-1];
-        allMarkets.length--;
 
-        // do we even need to have an event here? this is a hack anyway so less disturbed the better?
-        /* emit MarketUnlisted(cToken); */
+        require(set, "Market not found");
+        allMarkets[marketOutIdx] = CToken(cTokenIn);
+        delete markets[address(cTokenOut)];
+
+        emit MarketListed(cTokenIn);
 
         return uint(Error.NO_ERROR);
     }
