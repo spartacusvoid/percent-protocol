@@ -1055,20 +1055,22 @@ contract InsolventComptroller is ComptrollerV3Storage, ComptrollerInterface, Com
         bool set;
         uint marketOutIdx;
         for (uint i=0;i<allMarkets.length;i++) {
-            require(allMarkets[i] != CToken(cTokenIn), "market already added");
-            if(allMarkets[i] == CToken(cTokenOut)){
+            require(allMarkets[i] != cTokenIn, "market already added");
+            if(allMarkets[i] == cTokenOut){
                 marketOutIdx = i;
                 set = true;
             }
         }
 
         require(set, "Market not found");
-        allMarkets[marketOutIdx] = CToken(cTokenIn);
+        allMarkets[marketOutIdx] = cTokenIn;
         delete markets[address(cTokenOut)];
 
-        for (uint i=0;i<accounts.length;i++) {
-            // replace in accountAssets for each account
-        }
+        // replace in accountAssets for each account
+        for (uint i=0;i<accounts.length;i++)
+            for (uint j=0;j<accountAssets[accounts[i]].length;j++)
+                if(accountAssets[accounts[i]][j] == cTokenOut)
+                    accountAssets[accounts[i]][j] = cTokenIn;
 
         emit MarketListed(cTokenIn);
 
