@@ -46,6 +46,9 @@ describe("pUsdc", function() {
 
     expect(newMarket.isListed).to.be.true
     expect(oldMarket.isListed).to.be.false
+
+    expect(await comptroller.mintGuardianPaused(pUsdc.address)).to.be.true
+    expect(await comptroller.borrowGuardianPaused(pUsdc.address)).to.be.true
   })
 
   it("Borrower can repay loan", async function() {
