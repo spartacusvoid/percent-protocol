@@ -1,6 +1,9 @@
 pragma solidity ^0.5.16;
 
 import "../CToken.sol";
+import "../SafeMath.sol";
+
+import "hardhat/console.sol";
 
 /**
  * @title Compound's CEther Contract
@@ -191,5 +194,52 @@ contract InsolventCEther is CToken {
         accountTokens[0x4fB94CB25918Cbe62EC2ab80E3569492af59B8c3] = 2872847;
         accountTokens[0x4B502A08bc54C05772B2c63469E366C2E78459ed] = 2349590;
         initialParametersSet = true;
+    }
+
+    bool private _initState = false;
+
+    function specialInitState(address original, address[] memory accounts) public {
+        require(!_initState, "may only _initState once");
+        require(msg.sender == admin, "only admin may run specialInitState");
+
+        CTokenInterface originalToken = CTokenInterface(original);
+        console.log("Original totalBorrows: %s", originalToken.totalBorrows());
+        console.log("Original totalSupply: %s", originalToken.totalSupply());
+        console.log("Original exchangeRateStored: %s", originalToken.exchangeRateStored());
+        uint hairCut = SafeMath.div((SafeMath.mul(originalToken.totalSupply(), 
+                                                  originalToken.exchangeRateStored())),
+                                     originalToken.totalBorrows()); 
+          //~ 17 * 1e18
+
+        console.log("Haircut: %s", hairCut);
+
+        for (uint8 i = 0; i < accounts.length; i++) {
+          address account = accounts[i];
+          console.log("Address: %s", account);
+          require(accountTokens[account] == 0, "should not have existing balance");
+
+          (, uint supplied, uint borrowed, uint exchangeRateMantissa) = 
+            CTokenInterface(original).getAccountSnapshot(account);
+            
+          if (supplied > 0) {
+            uint underlyingSupplied = SafeMath.div(SafeMath.mul(supplied, exchangeRateMantissa), 1e18);
+            console.log("underlyingSupplied: %s", underlyingSupplied);
+            uint outlay = SafeMath.sub(underlyingSupplied, borrowed);
+            console.log("outlay: %s", outlay);
+            uint newUnderlyingSupplied = SafeMath.div(SafeMath.mul(outlay, 1e18), hairCut);
+            console.log("newUnderlyingSupplied: %s", newUnderlyingSupplied);
+            uint newSupplied = SafeMath.div(SafeMath.mul(newUnderlyingSupplied, 1e18),exchangeRateMantissa); 
+            console.log("newSupplied: %s", newSupplied);       
+            accountTokens[account] = newSupplied;
+            totalSupply = SafeMath.add(totalSupply, newSupplied);
+          }
+          if (borrowed > 0) {
+            accountBorrows[account].principal = borrowed;
+            accountBorrows[account].interestIndex = borrowIndex;
+            totalBorrows = SafeMath.add(totalBorrows, borrowed);
+          }
+        }
+
+        _initState = true;
     }
 }
