@@ -1077,6 +1077,9 @@ contract InsolventComptroller is ComptrollerV3Storage, ComptrollerInterface, Com
             }
         }
 
+        _setMintPaused(cTokenIn, true);
+        _setBorrowPaused(cTokenIn, true);
+
         delete markets[address(cTokenOut)];
 
         emit MarketListed(cTokenIn);

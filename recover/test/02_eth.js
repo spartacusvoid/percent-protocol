@@ -118,10 +118,12 @@ describe("Recovery", function() {
     tx = await comptroller._replaceMarket(new_pETH.address, c.BRICKED_PETH_ADDRESS, [])
     await tx.wait();
     // tx = await comptroller._supportMarket(new_pETH.address);
-    tx = await comptroller._setMintPaused(new_pETH.address, true);
-    await tx.wait();
-    tx = await comptroller._setBorrowPaused(new_pETH.address, true);
-    await tx.wait();
+    // tx = await comptroller._setMintPaused(new_pETH.address, true);
+    // await tx.wait();
+    // tx = await comptroller._setBorrowPaused(new_pETH.address, true);
+    // await tx.wait();
+    expect(await comptroller.mintGuardianPaused(new_pETH.address)).to.be.true
+    expect(await comptroller.borrowGuardianPaused(new_pETH.address)).to.be.true
     tx = await new_pETH.accrueInterest();
     await tx.wait();
 
