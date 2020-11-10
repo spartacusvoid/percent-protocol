@@ -1040,13 +1040,13 @@ contract InsolventComptroller is ComptrollerV3Storage, ComptrollerInterface, Com
 
         cTokenIn.isCToken(); // Sanity check to make sure its really a CToken
 
-        Market memory marketOut = markets[address(cTokenOut)];
+        Market storage marketOut = markets[address(cTokenOut)];
 
         if (!marketOut.isListed) {
             return fail(Error.MARKET_NOT_LISTED, FailureInfo.SUPPORT_MARKET_EXISTS);
         }
 
-        markets[address(cTokenIn)] = Market({
+        Market storage marketIn = markets[address(cTokenIn)] = Market({
           isListed: true,
           isComped: markets[address(cTokenOut)].isComped,
           collateralFactorMantissa: markets[address(cTokenOut)].collateralFactorMantissa
@@ -1064,13 +1064,20 @@ contract InsolventComptroller is ComptrollerV3Storage, ComptrollerInterface, Com
 
         require(set, "Market not found");
         allMarkets[marketOutIdx] = cTokenIn;
-        delete markets[address(cTokenOut)];
 
         // replace in accountAssets for each account
-        for (uint i=0;i<accounts.length;i++)
-            for (uint j=0;j<accountAssets[accounts[i]].length;j++)
+        for (uint i=0;i<accounts.length;i++){
+            if(marketOut.accountMembership[accounts[i]]){                       // check membership
+                /* addToMarketInternal(cTokenIn, accounts[i]); */               // using this doesn't work because it appends to accountAssets
+                marketIn.accountMembership[accounts[i]] = true;
+            }
+            for (uint j=0;j<accountAssets[accounts[i]].length;j++){
                 if(accountAssets[accounts[i]][j] == cTokenOut)
                     accountAssets[accounts[i]][j] = cTokenIn;
+            }
+        }
+
+        delete markets[address(cTokenOut)];
 
         emit MarketListed(cTokenIn);
 
