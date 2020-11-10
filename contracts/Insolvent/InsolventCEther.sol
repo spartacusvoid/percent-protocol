@@ -1,13 +1,13 @@
 pragma solidity ^0.5.16;
 
-import "./CToken.sol";
+import "../CToken.sol";
 
 /**
  * @title Compound's CEther Contract
  * @notice CToken which wraps Ether
  * @author Compound
  */
-contract TEST_CEther is CToken {
+contract InsolventCEther is CToken {
     /**
      * @notice Construct a new CEther money market
      * @param comptroller_ The address of the Comptroller

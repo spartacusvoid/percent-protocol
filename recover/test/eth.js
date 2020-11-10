@@ -5,17 +5,17 @@ let abi = require("../abi.json");
 const { ethers } = require('hardhat');
 
 describe("CEther", function() {
-  xit("Should deploy CEther", async function() {
+  it("Should deploy CEther", async function() {
     const signers = await ethers.getSigners();
 
-    const old_pETH = new ethers.Contract(addresses.frozenTokens[0], abi.OLD_PETH_ABI, signers[0])
+    const old_pETH = new ethers.Contract(addresses.frozenTokens[0].address, abi.OLD_PETH_ABI, signers[0])
 
-    const CEther = await ethers.getContractFactory("TEST_CEther");
+    const CEther = await ethers.getContractFactory("InsolventCEther");
 
     const admin = signers[0].address;
 
     const new_pETH = await CEther.deploy(
-      addresses.comptroller, //comptroller_
+      addresses.unitroller, //comptroller_
       "0xa4a5A4E04e0dFE6c792b3B8a71E818e263eD8678", //interestRateModel_ : WhitePaperModelV2Eth
       BigNumber.from("200388273633351366107209911"), //initialExchangeRateMantissa_
       "TEST Percent Ether", //name_
@@ -25,11 +25,11 @@ describe("CEther", function() {
     );
     await new_pETH.deployed();
 
-    expect(await new_pETH.totalSupply()).to.equal(0);
+    expect(await new_pETH.totalSupply() == 0).to.equal(true);
     await new_pETH.setInitialParameters();
     await new_pETH.accrueInterest();
 
-    expect(await new_pETH.totalSupply()).to.equal(92327748758);
+    expect(await new_pETH.totalSupply() == 92327748758).to.equal(true);
     expect(await new_pETH.totalBorrows() / 1e18).to.be.closeTo(await old_pETH.totalBorrows() / 1e18, 0.01);
 
     const owedEth = await old_pETH.totalBorrows() / 1e8;
@@ -57,7 +57,7 @@ const impersonateAccount = async address => {
 }
 
 describe("Timelock", function() {
-  xit("Should impersonate timelock", async function () {
+  it("Should impersonate timelock", async function () {
     const [account1] = await ethers.getSigners()
     tx = await account1.sendTransaction({to: addresses.timelock, value: ethers.utils.parseEther("1.0")})
     await tx.wait();
@@ -90,7 +90,7 @@ describe("Recovery", function() {
     await comptroller._setLiquidationIncentive(BigNumber.from("1000000000000000000")); //100%
     await comptroller._setSeizePaused(true);
     await comptroller._setTransferPaused(true);
-    const CEther = await ethers.getContractFactory("TEST_CEther");
+    const CEther = await ethers.getContractFactory("InsolventCEther");
 
     const new_pETH = await CEther.deploy(
       comptroller.address, //comptroller_
@@ -125,12 +125,8 @@ describe("Recovery", function() {
     });
 
     const old_comptroller = new ethers.Contract(addresses.unitroller, abi.COMPTROLLER_ABI, timelockSigner);
-    await Promise.all(Array(6).fill().map(async (_,i) => {
-        const asset = await old_comptroller.accountAssets(addresses.yfiLender, i);
-        console.log(asset);
-    }));
-    //const liquidity = await comptroller.getAccountLiquidity(addresses.yfiLender);
 
-    //console.log(liquidity);
+    console.log(await old_comptroller.getAssetsIn(addresses.yfiLender));
+    console.log(await old_comptroller.getAccountLiquidity(addresses.yfiLender));
   })
 });
