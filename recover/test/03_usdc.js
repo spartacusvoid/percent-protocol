@@ -81,29 +81,25 @@ describe("pUSDC", function() {
     expect(await comptroller.borrowGuardianPaused(new_pUSDC.address)).to.be.true
   })
 
-  // it("Borrower can repay loan", async function() {
-  //   const lockedUSDCBorrower = "0xda248cC10b477C1144219183EC87b0621DAC37b3"
-  //   const usdc = await hre.ethers.getContractAt(USDC_ABI, c.USDC_ADDRESS)
-  //   const borrowed = await new_pUSDC.borrowBalanceStored(lockedUSDCBorrower);
-  //   let hasEnough = expect((await usdc.balanceOf(lockedUSDCBorrower)).gte(borrowed)).to.be.true
-  //   if(hasEnough == Assertion.false)
-  //     throw new Error("the example locked usdc borrower does not have enough funds to repay the loan. find another borrower that does or workout how to fake mint usdc to the borrower.")
-  //
-  //   await hre.network.provider.request({
-  //     method: "hardhat_impersonateAccount",
-  //     params: [lockedUSDCBorrower]
-  //   })
-  //   const lockedUSDCSigner = await ethers.provider.getSigner(lockedUSDCBorrower)
-  //
-  //   tx = await usdc.connect(lockedUSDCSigner).approve(new_pUSDC.address, c.MAX_INT)
-  //   await tx.wait()
-  //
-  //   tx = await new_pUSDC.connect(lockedUSDCSigner).repayBorrow(borrowed)
-  //   await tx.wait()
-  //
-  //   const finalBorrowBalance = await new_pUSDC.borrowBalanceStored(lockedUSDCBorrower)
-  //
-  //   expect(finalBorrowBalance.lt(borrowed)).to.be.true
-  // });
+  it("Borrower can repay loan", async function() {
+    const lockedUSDCBorrower = "0xda248cC10b477C1144219183EC87b0621DAC37b3"
+    const usdc = await hre.ethers.getContractAt(USDC_ABI, c.USDC_ADDRESS)
+    const borrowed = await new_pUSDC.borrowBalanceStored(lockedUSDCBorrower);
+    let hasEnough = expect((await usdc.balanceOf(lockedUSDCBorrower)).gte(borrowed)).to.be.true
+    if(hasEnough == Assertion.false)
+      throw new Error("the example locked usdc borrower does not have enough funds to repay the loan. find another borrower that does or workout how to fake mint usdc to the borrower.")
+
+    const lockedUSDCSigner = await impersonateAccount(lockedUSDCBorrower)
+
+    tx = await usdc.connect(lockedUSDCSigner).approve(new_pUSDC.address, c.MAX_INT)
+    await tx.wait()
+
+    tx = await new_pUSDC.connect(lockedUSDCSigner).repayBorrow(borrowed)
+    await tx.wait()
+
+    const finalBorrowBalance = await new_pUSDC.borrowBalanceStored(lockedUSDCBorrower)
+
+    expect(finalBorrowBalance.lt(borrowed)).to.be.true
+  });
 
 });
