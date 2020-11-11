@@ -1,44 +1,40 @@
 const { expect } = require("chai");
-const hre = require("hardhat");
-const ethers = hre.ethers;
-const { BigNumber } = ethers;
 const c = require("../constants");
-let addresses = require("../addresses.json");
+const { impersonateAccount, deployCErc20, deployCEther } = require("../utils");
 let abi = require("../abi.json");
-const { impersonateAccount, deployCErc20 } = require("../utils");
-let tx, timelockSigner, pUsdc
+let addresses = require("../addresses.json");
+let tx, timelockSigner, old_pETH, new_pETH
 
 before(async function(){
   timelockSigner = await impersonateAccount(c.TIMELOCK_ADDRESS)
 })
 
-describe("CEther", function() {
-  it("Should deploy CEther", async function() {
-    const signers = await ethers.getSigners();
+describe("pETH", function() {
+  let new_pUSDC
+  before(async function(){
+    old_pETH = await ethers.getContractAt("CTokenInterface", c.BRICKED_PUSDC_ADDRESS)
+    new_pETH = await deployCEther("TEST Percent PETH", "TPETH", await old_pETH.reserveFactorMantissa(), timelockSigner)
+  })
 
-    const old_pETH = new ethers.Contract(addresses.frozenTokens[0].address, abi.OLD_PETH_ABI, signers[0])
+  it("Should have timelock as admin", async function() {
+    expect(await new_pETH.admin()).to.equal(c.TIMELOCK_ADDRESS);
+  });
 
-    const CEther = await ethers.getContractFactory("InsolventCEther");
-
-    const admin = signers[0].address;
-
-    const new_pETH = await CEther.deploy(
-      addresses.unitroller, //comptroller_
-      "0xa4a5A4E04e0dFE6c792b3B8a71E818e263eD8678", //interestRateModel_ : WhitePaperModelV2Eth
-      BigNumber.from("200388273633351366107209911"), //initialExchangeRateMantissa_
-      "TEST Percent Ether", //name_
-      "TPETH", //symbol_
-      8, //decimals_
-      admin, //admin_
-    );
-    await new_pETH.deployed();
-
+  it("Can Initialise correct balances", async function() {
     expect(await new_pETH.totalSupply() == 0).to.equal(true);
-    await new_pETH.setInitialParameters();
+    tx = await new_pETH.specialInitState(c.BRICKED_PETH_ADDRESS, c.PETH_ACCOUNTS);
+    await tx.wait()
+
     await new_pETH.accrueInterest();
 
-    expect(await new_pETH.totalSupply() == 92327748758).to.equal(true);
-    expect(await new_pETH.totalBorrows() / 1e18).to.be.closeTo(await old_pETH.totalBorrows() / 1e18, 0.01);
+    const newTotalSupply = await new_pETH.totalSupply();
+    const newExchangeRate = await new_pETH.exchangeRateStored();
+    const newTotalBorrows = await new_pETH.totalBorrows();
+
+    const newUnderlyingSupply = newTotalSupply * newExchangeRate / 1e18;
+
+    expect(newUnderlyingSupply / 1e18).to.be.closeTo(newTotalBorrows / 1e18, 0.01);
+    expect(newTotalBorrows / 1e18).to.be.closeTo(await old_pETH.totalBorrows() / 1e18, 0.01);
 
     const owedEth = await old_pETH.totalBorrows() / 1e8;
 
@@ -53,84 +49,22 @@ describe("CEther", function() {
     const newTopBalance = newTopAccountSnapshot[1] / 1e8 * newTopAccountSnapshot[3] / 1e18;
 
     expect(newTopBalance / oldTopBalance).to.be.closeTo(hairCut, 0.01);
+  })
 
-  });
-});
-
-// const impersonateAccount = async address => {
-//   await hre.network.provider.request({
-//     method: "hardhat_impersonateAccount",
-//     params: [address]
-//   })
-// }
-
-// describe("Timelock", function() {
-//   it("Should impersonate timelock", async function () {
-//     const [account1] = await ethers.getSigners()
-//     tx = await account1.sendTransaction({to: addresses.timelock, value: ethers.utils.parseEther("1.0")})
-//     await tx.wait();
-//     await impersonateAccount(addresses.timelock);
-//     const timelockSigner = ethers.provider.getSigner(addresses.timelock);
-//     const unitroller = new ethers.Contract(addresses.unitroller, abi.UNITROLLER_ABI, timelockSigner);
-//     await unitroller._setPendingAdmin(account1.address);
-//     const unitrollerAsAccount1 = unitroller.connect(account1);
-//     await unitrollerAsAccount1._acceptAdmin();
-//   })
-// })
-
-describe("Recovery", function() {
-  it("Should create new Comptroller and add new pETH contract", async function () {
-    // const signers = await ethers.getSigners();
-    //
-    // const Unitroller = await ethers.getContractFactory("Unitroller");
-    // const new_Unitroller = await Unitroller.deploy();
-    // await new_Unitroller.deployed();
-    // const Comptroller = await ethers.getContractFactory("Comptroller");
-    // const new_Comptroller = await Comptroller.deploy();
-    // await new_Comptroller.deployed();
-    // await new_Unitroller._setPendingImplementation(new_Comptroller.address);
-    // await new_Comptroller._become(new_Unitroller.address);
-    //
-    // const comptroller = new ethers.Contract(new_Unitroller.address, abi.COMPTROLLER_ABI, signers[0]);
-    // await comptroller._setPriceOracle(addresses.chainlinkPriceOracleProxy);
-    // await comptroller._setCloseFactor(BigNumber.from("1000000000000000000")); //100%
-    // await comptroller._setMaxAssets(20);
-    // await comptroller._setLiquidationIncentive(BigNumber.from("1000000000000000000")); //100%
-    // await comptroller._setSeizePaused(true);
-    // await comptroller._setTransferPaused(true);
+  it("Can replace old market in comptroller", async function(){
+    // const pUSDC_bricked = await hre.ethers.getContractAt("CTokenInterface", BRICKED_PUSDC_ADDRESS);
     const comptroller = await hre.ethers.getContractAt("InsolventComptroller", c.UNITROLLER_ADDRESS, timelockSigner);
-    const CEther = await ethers.getContractFactory("InsolventCEther", timelockSigner);
+    tx = await comptroller._replaceMarket(new_pETH.address, c.BRICKED_PETH_ADDRESS, c.PUSDC_ACCOUNTS)
+    await tx.wait()
 
-    const new_pETH = await CEther.deploy(
-      comptroller.address, //comptroller_
-      "0xa4a5A4E04e0dFE6c792b3B8a71E818e263eD8678", //interestRateModel_ : WhitePaperModelV2Eth
-      BigNumber.from("200388273633351366107209911"), //initialExchangeRateMantissa_
-      "TEST Percent Ether", //name_
-      "TPETH", //symbol_
-      8, //decimals_
-      c.TIMELOCK_ADDRESS, //admin_
-    );
-    await new_pETH.deployed();
+    const newMarket = await comptroller.markets(new_pETH.address)
+    const oldMarket = await comptroller.markets(c.BRICKED_PETH_ADDRESS)
 
-    tx = await new_pETH.setInitialParameters();
-    await tx.wait();
+    expect(newMarket.isListed).to.be.true
+    expect(oldMarket.isListed).to.be.false
 
-    tx = await comptroller._replaceMarket(new_pETH.address, c.BRICKED_PETH_ADDRESS, [])
-    await tx.wait();
-    // tx = await comptroller._supportMarket(new_pETH.address);
-    // tx = await comptroller._setMintPaused(new_pETH.address, true);
-    // await tx.wait();
-    // tx = await comptroller._setBorrowPaused(new_pETH.address, true);
-    // await tx.wait();
     expect(await comptroller.mintGuardianPaused(new_pETH.address)).to.be.true
     expect(await comptroller.borrowGuardianPaused(new_pETH.address)).to.be.true
-    tx = await new_pETH.accrueInterest();
-    await tx.wait();
-
-    // const tx = await signers[0].sendTransaction({to: addresses.timelock, value: ethers.utils.parseEther("1.0")})
-    // await tx.wait();
-    // await impersonateAccount(addresses.timelock);
-    // const timelockSigner = ethers.provider.getSigner(addresses.timelock);
 
     // addresses.workingTokens.forEach(async t => {
     //   const token = new ethers.Contract(t.address, abi.CTOKEN_ABI, timelockSigner);
@@ -147,4 +81,5 @@ describe("Recovery", function() {
     // console.log(await old_comptroller.getAssetsIn(addresses.yfiLender));
     // console.log(await old_comptroller.getAccountLiquidity(addresses.yfiLender));
   })
+
 });

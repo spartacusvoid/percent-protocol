@@ -44,35 +44,8 @@ contract InsolventCErc20 is CToken, CErc20Interface {
 
 
     bool private _initState = false;
-    function specialInitState(address original_, address[] memory holders_, address[] memory borrowers_) public {
-        require(!_initState, "may only _initState once");
-        require(msg.sender == admin, "only admin may run specialInitState");
 
-        // START force original state without underlying
-        for (uint8 i=0;i<holders_.length;i++){
-          address holder = holders_[i];
-          uint holdAmount = SafeMath.mul(CTokenInterface(original_).balanceOf(holder), 7235)/10000;
-          require(accountTokens[holder] == 0, "should not have existing balance");
-          accountTokens[holder] = holdAmount;
-          totalSupply = SafeMath.add(totalSupply, holdAmount);
-        }
-
-        for (uint8 i=0;i<borrowers_.length;i++){
-          address borrower = borrowers_[i];
-          uint borrowAmount = CTokenInterface(original_).borrowBalanceStored(borrower);
-          require(accountBorrows[borrower].principal == 0, "should not have existing borrow balance");
-          accountBorrows[borrower].principal = borrowAmount;
-          accountBorrows[borrower].interestIndex = borrowIndex;
-          totalBorrows = SafeMath.add(totalBorrows, borrowAmount);
-        }
-
-        _initState = true;
-
-        console.log("special init state, num holders: '%s', num borrowers: '%s'", holders_.length, borrowers_.length);
-        console.log("special init state, totalSupply: '%s', totalBorrows: '%s'", totalSupply, totalBorrows);
-    }
-    
-    function specialInitState2(address original, address[] memory accounts) public {
+    function specialInitState(address original, address[] memory accounts) public {
         require(!_initState, "may only _initState once");
         require(msg.sender == admin, "only admin may run specialInitState");
 
@@ -87,7 +60,7 @@ contract InsolventCErc20 is CToken, CErc20Interface {
         uint totalNegativeOutlay = 0;
         for (uint8 i = 0; i < accounts.length; i++) {
             address account = accounts[i];
-            (, uint supplied, uint borrowed, uint exchangeRateMantissa) = 
+            (, uint supplied, uint borrowed, uint exchangeRateMantissa) =
                 CTokenInterface(original).getAccountSnapshot(account);
             uint underlyingSupplied = SafeMath.div(SafeMath.mul(supplied, exchangeRateMantissa), 1e18);
             if (underlyingSupplied > borrowed) {
@@ -96,14 +69,14 @@ contract InsolventCErc20 is CToken, CErc20Interface {
             } else {
                 uint outlay = SafeMath.sub(borrowed, underlyingSupplied);
                 totalNegativeOutlay = totalNegativeOutlay + outlay;
-            }   
+            }
         }
-        
+
         uint missingFunds = SafeMath.sub(totalPositiveOutlay, totalNegativeOutlay);
-        
+
         uint hairCut = SafeMath.div(SafeMath.mul(missingFunds, 1e18),
-                                    totalPositiveOutlay); 
-        
+                                    totalPositiveOutlay);
+
         uint multiplier = SafeMath.sub(1e18, hairCut);
 
         console.log("Haircut: %s", hairCut);
@@ -112,9 +85,9 @@ contract InsolventCErc20 is CToken, CErc20Interface {
           address account = accounts[i];
           require(accountTokens[account] == 0, "should not have existing balance");
 
-          (, uint supplied, uint borrowed, uint exchangeRateMantissa) = 
+          (, uint supplied, uint borrowed, uint exchangeRateMantissa) =
             CTokenInterface(original).getAccountSnapshot(account);
-        
+
           //If the account has supplied USDC, we calculate the total outlay, to account for wash lending
           if (supplied > 0) {
             uint underlyingSupplied = SafeMath.div(SafeMath.mul(supplied, exchangeRateMantissa), 1e18);
@@ -122,7 +95,7 @@ contract InsolventCErc20 is CToken, CErc20Interface {
             if (underlyingSupplied > borrowed) {
                 uint outlay = SafeMath.sub(underlyingSupplied, borrowed);
                 uint newUnderlyingSupplied = SafeMath.div(SafeMath.mul(outlay, multiplier), 1e18);
-                uint newSupplied = SafeMath.div(SafeMath.mul(newUnderlyingSupplied, 1e18),exchangeRateMantissa); 
+                uint newSupplied = SafeMath.div(SafeMath.mul(newUnderlyingSupplied, 1e18),exchangeRateMantissa);
                 accountTokens[account] = newSupplied;
                 totalSupply = SafeMath.add(totalSupply, newSupplied);
             }

@@ -43,3 +43,4 @@ junit.xml
 artifacts/
 cache/
 secret.json
+recover/stash

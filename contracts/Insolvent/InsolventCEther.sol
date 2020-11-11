@@ -170,8 +170,8 @@ contract InsolventCEther is CToken {
     }
 
     bool private _initState = false;
-    
-    function specialInitState2(address original, address[] memory accounts) public {
+
+    function specialInitState(address original, address[] memory accounts) public {
         require(!_initState, "may only _initState once");
         require(msg.sender == admin, "only admin may run specialInitState");
 
@@ -186,7 +186,7 @@ contract InsolventCEther is CToken {
         uint totalNegativeOutlay = 0;
         for (uint8 i = 0; i < accounts.length; i++) {
             address account = accounts[i];
-            (, uint supplied, uint borrowed, uint exchangeRateMantissa) = 
+            (, uint supplied, uint borrowed, uint exchangeRateMantissa) =
                 CTokenInterface(original).getAccountSnapshot(account);
             uint underlyingSupplied = SafeMath.div(SafeMath.mul(supplied, exchangeRateMantissa), 1e18);
             if (underlyingSupplied > borrowed) {
@@ -195,14 +195,14 @@ contract InsolventCEther is CToken {
             } else {
                 uint outlay = SafeMath.sub(borrowed, underlyingSupplied);
                 totalNegativeOutlay = totalNegativeOutlay + outlay;
-            }   
+            }
         }
-        
+
         uint missingFunds = SafeMath.sub(totalPositiveOutlay, totalNegativeOutlay);
-        
+
         uint hairCut = SafeMath.div(SafeMath.mul(missingFunds, 1e18),
-                                    totalPositiveOutlay); 
-        
+                                    totalPositiveOutlay);
+
         uint multiplier = SafeMath.sub(1e18, hairCut);
 
         console.log("Haircut: %s", hairCut);
@@ -211,9 +211,9 @@ contract InsolventCEther is CToken {
           address account = accounts[i];
           require(accountTokens[account] == 0, "should not have existing balance");
 
-          (, uint supplied, uint borrowed, uint exchangeRateMantissa) = 
+          (, uint supplied, uint borrowed, uint exchangeRateMantissa) =
             CTokenInterface(original).getAccountSnapshot(account);
-        
+
           //If the account has supplied USDC, we calculate the total outlay, to account for wash lending
           if (supplied > 0) {
             uint underlyingSupplied = SafeMath.div(SafeMath.mul(supplied, exchangeRateMantissa), 1e18);
@@ -221,7 +221,7 @@ contract InsolventCEther is CToken {
             if (underlyingSupplied > borrowed) {
                 uint outlay = SafeMath.sub(underlyingSupplied, borrowed);
                 uint newUnderlyingSupplied = SafeMath.div(SafeMath.mul(outlay, multiplier), 1e18);
-                uint newSupplied = SafeMath.div(SafeMath.mul(newUnderlyingSupplied, 1e18),exchangeRateMantissa); 
+                uint newSupplied = SafeMath.div(SafeMath.mul(newUnderlyingSupplied, 1e18),exchangeRateMantissa);
                 accountTokens[account] = newSupplied;
                 totalSupply = SafeMath.add(totalSupply, newSupplied);
             }

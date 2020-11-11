@@ -1,6 +1,7 @@
 const hre = require("hardhat");
 const ethers = hre.ethers;
-const { UNITROLLER_ADDRESS, INTEREST_RATE_MODEL_ADDRESS, INITIAL_EXCHANGE_RATE_MANTISSA } = require("./constants");
+const c = require("./constants");
+const { BigNumber } = ethers;
 
 const impersonateAccount = async address => {
   const [account1] = await ethers.getSigners()
@@ -26,9 +27,9 @@ const deployCErc20 = async (underlying, name, symbol, reserveFactor, adminSigner
   const adminAddress = await adminSigner.getAddress()
   const cErc20Delegator = await InsolventCErc20Delegator.deploy(
     underlying,                          // underlying_
-    UNITROLLER_ADDRESS,                  // comptroller_
-    INTEREST_RATE_MODEL_ADDRESS,         // interestRateModel_
-    INITIAL_EXCHANGE_RATE_MANTISSA,      // initialExchangeRateMantissa_
+    c.UNITROLLER_ADDRESS,                  // comptroller_
+    c.INTEREST_RATE_MODEL_ADDRESS,         // interestRateModel_
+    c.INITIAL_EXCHANGE_RATE_MANTISSA,      // initialExchangeRateMantissa_
     name,                                // name_
     symbol,                              // symbol_
     8,                                   // decimals_
@@ -45,7 +46,29 @@ const deployCErc20 = async (underlying, name, symbol, reserveFactor, adminSigner
   return cErc20
 }
 
+const deployCEther = async (name, symbol, reserveFactor, adminSigner) => {
+  const CEther = await ethers.getContractFactory("InsolventCEther", adminSigner);
+  const adminAddress = await adminSigner.getAddress()
+
+  const cEther = await CEther.deploy(
+    c.UNITROLLER_ADDRESS, //comptroller_
+    "0xa4a5A4E04e0dFE6c792b3B8a71E818e263eD8678", //interestRateModel_ : WhitePaperModelV2Eth
+    BigNumber.from("200388273633351366107209911"), //initialExchangeRateMantissa_
+    name, //name_
+    symbol, //symbol_
+    8, //decimals_
+    adminAddress, //admin_
+  );
+  await cEther.deployed();
+
+  const tx = await cEther._setReserveFactor(reserveFactor);
+  await tx.wait()
+
+  return cEther
+}
+
 module.exports = {
   impersonateAccount,
-  deployCErc20
+  deployCErc20,
+  deployCEther
 }
