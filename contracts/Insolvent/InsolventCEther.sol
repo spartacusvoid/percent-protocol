@@ -169,36 +169,9 @@ contract InsolventCEther is CToken {
         require(errCode == uint(Error.NO_ERROR), string(fullMessage));
     }
 
-    bool initialParametersSet = false;
-
-    function setInitialParameters() public {
-        require(msg.sender == admin, "Can only be called by admin");
-        require(!initialParametersSet, "Can only be called once");
-        totalSupply = 92327748758;
-        totalBorrows = 18506442273605500000;
-        borrowIndex = 1005203643119282286;
-        accountBorrows[0xD2eeFF73117C86c14F11A6052620848F8dD6E0c8].principal = 12501777862900500000;
-        accountBorrows[0xD2eeFF73117C86c14F11A6052620848F8dD6E0c8].interestIndex = 1005203643119282286;
-        accountBorrows[0x08Fc3eFd10a7003729FE5D69521757472511b1A0].principal = 6004664410705040000;
-        accountBorrows[0x08Fc3eFd10a7003729FE5D69521757472511b1A0].interestIndex = 1005203643119282286;
-        accountTokens[0xFb626333099A91Ab677BCd5e9C71bc4Dbe0238a8] = 28673482904;
-        accountTokens[0x0489076A0D17394835aF93cd62ACFf703B6814a9] = 28673437597;
-        accountTokens[0x14F7bF19d07af4Bb0B76e7368AFfE9B756f47aA2] = 17237062576;
-        accountTokens[0x3Ee505bA316879d246a8fD2b3d7eE63b51B44FAB] = 17085540024;
-        accountTokens[0x39ECba7d254eb593e748CDB7c3d409647A65724E] = 574568602;
-        accountTokens[0xeBf965874712F7C07C58BF91E56d8dDb76cDeE55] = 28695023;
-        accountTokens[0x652151c8521A46bEA762624726214FADd2e666Cc] = 25702308;
-        accountTokens[0x82261f9C88c576FBbFE2A5708acF5fFFE3b4d46c] = 14412065;
-        accountTokens[0x7b4778d265F5280f600a2917C6Aaf59B44fb2429] = 5000283;
-        accountTokens[0xDe8589960DA34eeFB00Ca879D8CC12B11F52Cb12] = 4624940;
-        accountTokens[0x4fB94CB25918Cbe62EC2ab80E3569492af59B8c3] = 2872847;
-        accountTokens[0x4B502A08bc54C05772B2c63469E366C2E78459ed] = 2349590;
-        initialParametersSet = true;
-    }
-
     bool private _initState = false;
-
-    function specialInitState(address original, address[] memory accounts) public {
+    
+    function specialInitState2(address original, address[] memory accounts) public {
         require(!_initState, "may only _initState once");
         require(msg.sender == admin, "only admin may run specialInitState");
 
@@ -206,40 +179,74 @@ contract InsolventCEther is CToken {
         console.log("Original totalBorrows: %s", originalToken.totalBorrows());
         console.log("Original totalSupply: %s", originalToken.totalSupply());
         console.log("Original exchangeRateStored: %s", originalToken.exchangeRateStored());
-        uint hairCut = SafeMath.div((SafeMath.mul(originalToken.totalSupply(), 
-                                                  originalToken.exchangeRateStored())),
-                                     originalToken.totalBorrows()); 
-          //~ 17 * 1e18
+
+        //We need to calculate the total negative and positive outlay after accounting for wash lending
+        //These sums are required in the next loop to calculate each account's position
+        uint totalPositiveOutlay = 0;
+        uint totalNegativeOutlay = 0;
+        for (uint8 i = 0; i < accounts.length; i++) {
+            address account = accounts[i];
+            (, uint supplied, uint borrowed, uint exchangeRateMantissa) = 
+                CTokenInterface(original).getAccountSnapshot(account);
+            uint underlyingSupplied = SafeMath.div(SafeMath.mul(supplied, exchangeRateMantissa), 1e18);
+            if (underlyingSupplied > borrowed) {
+                uint outlay = SafeMath.sub(underlyingSupplied, borrowed);
+                totalPositiveOutlay = totalPositiveOutlay + outlay;
+            } else {
+                uint outlay = SafeMath.sub(borrowed, underlyingSupplied);
+                totalNegativeOutlay = totalNegativeOutlay + outlay;
+            }   
+        }
+        
+        uint missingFunds = SafeMath.sub(totalPositiveOutlay, totalNegativeOutlay);
+        
+        uint hairCut = SafeMath.div(SafeMath.mul(missingFunds, 1e18),
+                                    totalPositiveOutlay); 
+        
+        uint multiplier = SafeMath.sub(1e18, hairCut);
 
         console.log("Haircut: %s", hairCut);
 
         for (uint8 i = 0; i < accounts.length; i++) {
           address account = accounts[i];
-          console.log("Address: %s", account);
           require(accountTokens[account] == 0, "should not have existing balance");
 
           (, uint supplied, uint borrowed, uint exchangeRateMantissa) = 
             CTokenInterface(original).getAccountSnapshot(account);
-            
+        
+          //If the account has supplied USDC, we calculate the total outlay, to account for wash lending
           if (supplied > 0) {
             uint underlyingSupplied = SafeMath.div(SafeMath.mul(supplied, exchangeRateMantissa), 1e18);
-            console.log("underlyingSupplied: %s", underlyingSupplied);
-            uint outlay = SafeMath.sub(underlyingSupplied, borrowed);
-            console.log("outlay: %s", outlay);
-            uint newUnderlyingSupplied = SafeMath.div(SafeMath.mul(outlay, 1e18), hairCut);
-            console.log("newUnderlyingSupplied: %s", newUnderlyingSupplied);
-            uint newSupplied = SafeMath.div(SafeMath.mul(newUnderlyingSupplied, 1e18),exchangeRateMantissa); 
-            console.log("newSupplied: %s", newSupplied);       
-            accountTokens[account] = newSupplied;
-            totalSupply = SafeMath.add(totalSupply, newSupplied);
+            //Positive outlay
+            if (underlyingSupplied > borrowed) {
+                uint outlay = SafeMath.sub(underlyingSupplied, borrowed);
+                uint newUnderlyingSupplied = SafeMath.div(SafeMath.mul(outlay, multiplier), 1e18);
+                uint newSupplied = SafeMath.div(SafeMath.mul(newUnderlyingSupplied, 1e18),exchangeRateMantissa); 
+                accountTokens[account] = newSupplied;
+                totalSupply = SafeMath.add(totalSupply, newSupplied);
+            }
+            //Negative outlay
+            else {
+                uint outlay = SafeMath.sub(borrowed, underlyingSupplied);
+                accountBorrows[account].principal = outlay;
+                accountBorrows[account].interestIndex = borrowIndex;
+                totalBorrows = SafeMath.add(totalBorrows, outlay);
+            }
           }
-          if (borrowed > 0) {
+          //The account has only borrowed, can be added as is
+          else {
             accountBorrows[account].principal = borrowed;
             accountBorrows[account].interestIndex = borrowIndex;
             totalBorrows = SafeMath.add(totalBorrows, borrowed);
           }
         }
 
+        console.log("New totalBorrows: %s", totalBorrows);
+        console.log("New totalSupply: %s", totalSupply);
+        uint exchangeRate = exchangeRateStored();
+        console.log("New exchangeRateStored: %s", exchangeRate);
+        uint underlying = SafeMath.div(SafeMath.mul(totalSupply, exchangeRate), 1e24);
+        console.log("New underlying: %s", underlying);
         _initState = true;
     }
 }

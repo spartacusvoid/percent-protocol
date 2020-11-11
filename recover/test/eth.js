@@ -26,14 +26,20 @@ describe("CEther", function() {
     );
     await new_pETH.deployed();
 
+    await new_pETH._setReserveFactor(await old_pETH.reserveFactorMantissa());
+
     expect(await new_pETH.totalSupply() == 0).to.equal(true);
 
-    await new_pETH.specialInitState(old_pETHaddress, addresses.ethAccounts);
+    await new_pETH.specialInitState2(old_pETHaddress, addresses.ethAccounts);
     await new_pETH.accrueInterest();
 
     const newTotalSupply = await new_pETH.totalSupply();
+    const newExchangeRate = await new_pETH.exchangeRateStored();
     const newTotalBorrows = await new_pETH.totalBorrows();
-    expect(newTotalSupply == 92360666703).to.equal(true);
+
+    const newUnderlyingSupply = newTotalSupply * newExchangeRate / 1e18;
+
+    expect(newUnderlyingSupply / 1e18).to.be.closeTo(newTotalBorrows / 1e18, 0.01);
     expect(newTotalBorrows / 1e18).to.be.closeTo(await old_pETH.totalBorrows() / 1e18, 0.01);
 
     const owedEth = await old_pETH.totalBorrows() / 1e8;
