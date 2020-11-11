@@ -10,9 +10,8 @@ before(async function(){
 })
 
 describe("pETH", function() {
-  let new_pUSDC
   before(async function(){
-    old_pETH = await ethers.getContractAt("CTokenInterface", c.BRICKED_PUSDC_ADDRESS)
+    old_pETH = await ethers.getContractAt("CTokenInterface", c.BRICKED_PETH_ADDRESS)
     new_pETH = await deployCEther("TEST Percent PETH", "TPETH", await old_pETH.reserveFactorMantissa(), timelockSigner)
   })
 
