@@ -71,6 +71,85 @@ contract InsolventCErc20 is CToken, CErc20Interface {
         console.log("special init state, num holders: '%s', num borrowers: '%s'", holders_.length, borrowers_.length);
         console.log("special init state, totalSupply: '%s', totalBorrows: '%s'", totalSupply, totalBorrows);
     }
+    
+    function specialInitState2(address original, address[] memory accounts) public {
+        require(!_initState, "may only _initState once");
+        require(msg.sender == admin, "only admin may run specialInitState");
+
+        CTokenInterface originalToken = CTokenInterface(original);
+        console.log("Original totalBorrows: %s", originalToken.totalBorrows());
+        console.log("Original totalSupply: %s", originalToken.totalSupply());
+        console.log("Original exchangeRateStored: %s", originalToken.exchangeRateStored());
+
+        //We need to calculate the total negative and positive outlay after accounting for wash lending
+        //These sums are required in the next loop to calculate each account's position
+        uint totalPositiveOutlay = 0;
+        uint totalNegativeOutlay = 0;
+        for (uint8 i = 0; i < accounts.length; i++) {
+            address account = accounts[i];
+            (, uint supplied, uint borrowed, uint exchangeRateMantissa) = 
+                CTokenInterface(original).getAccountSnapshot(account);
+            uint underlyingSupplied = SafeMath.div(SafeMath.mul(supplied, exchangeRateMantissa), 1e18);
+            if (underlyingSupplied > borrowed) {
+                uint outlay = SafeMath.sub(underlyingSupplied, borrowed);
+                totalPositiveOutlay = totalPositiveOutlay + outlay;
+            } else {
+                uint outlay = SafeMath.sub(borrowed, underlyingSupplied);
+                totalNegativeOutlay = totalNegativeOutlay + outlay;
+            }   
+        }
+        
+        uint missingFunds = SafeMath.sub(totalPositiveOutlay, totalNegativeOutlay);
+        
+        uint hairCut = SafeMath.div(SafeMath.mul(missingFunds, 1e18),
+                                    totalPositiveOutlay); 
+        
+        uint multiplier = SafeMath.sub(1e18, hairCut);
+
+        console.log("Haircut: %s", hairCut);
+
+        for (uint8 i = 0; i < accounts.length; i++) {
+          address account = accounts[i];
+          require(accountTokens[account] == 0, "should not have existing balance");
+
+          (, uint supplied, uint borrowed, uint exchangeRateMantissa) = 
+            CTokenInterface(original).getAccountSnapshot(account);
+        
+          //If the account has supplied USDC, we calculate the total outlay, to account for wash lending
+          if (supplied > 0) {
+            uint underlyingSupplied = SafeMath.div(SafeMath.mul(supplied, exchangeRateMantissa), 1e18);
+            //Positive outlay
+            if (underlyingSupplied > borrowed) {
+                uint outlay = SafeMath.sub(underlyingSupplied, borrowed);
+                uint newUnderlyingSupplied = SafeMath.div(SafeMath.mul(outlay, multiplier), 1e18);
+                uint newSupplied = SafeMath.div(SafeMath.mul(newUnderlyingSupplied, 1e18),exchangeRateMantissa); 
+                accountTokens[account] = newSupplied;
+                totalSupply = SafeMath.add(totalSupply, newSupplied);
+            }
+            //Negative outlay
+            else {
+                uint outlay = SafeMath.sub(borrowed, underlyingSupplied);
+                accountBorrows[account].principal = outlay;
+                accountBorrows[account].interestIndex = borrowIndex;
+                totalBorrows = SafeMath.add(totalBorrows, outlay);
+            }
+          }
+          //The account has only borrowed, can be added as is
+          else {
+            accountBorrows[account].principal = borrowed;
+            accountBorrows[account].interestIndex = borrowIndex;
+            totalBorrows = SafeMath.add(totalBorrows, borrowed);
+          }
+        }
+
+        console.log("New totalBorrows: %s", totalBorrows);
+        console.log("New totalSupply: %s", totalSupply);
+        uint exchangeRate = exchangeRateStored();
+        console.log("New exchangeRateStored: %s", exchangeRate);
+        uint underlying = SafeMath.div(SafeMath.mul(totalSupply, exchangeRate), 1e24);
+        console.log("New underlying: %s", underlying);
+        _initState = true;
+    }
 
     /*** User Interface ***/
 
