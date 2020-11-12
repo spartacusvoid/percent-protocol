@@ -2,7 +2,8 @@ const { Assertion, expect } = require("chai");
 const c = require("../constants");
 const { impersonateAccount, deployCErc20 } = require("../utils");
 const USDC_ABI = require("../usdc_abi");
-let tx, timelockSigner, new_pUSDC, old_pUSDC
+const { Zero } = ethers.constants
+let tx, timelockSigner, new_pUSDC, old_pUSDC, comptroller, chainlinkPriceOracle
 
 before(async function(){
   timelockSigner = await impersonateAccount(c.TIMELOCK_ADDRESS)
@@ -13,6 +14,8 @@ describe("pUSDC", function() {
   before(async function(){
     old_pUSDC = await ethers.getContractAt("CTokenInterface", c.BRICKED_PUSDC_ADDRESS)
     new_pUSDC = await deployCErc20(c.USDC_ADDRESS, "Percent USDC", "pUSDC", await old_pUSDC.reserveFactorMantissa(), timelockSigner)
+    comptroller = await hre.ethers.getContractAt("InsolventComptroller", c.UNITROLLER_ADDRESS, timelockSigner);
+    chainlinkPriceOracle = await hre.ethers.getContractAt("ChainlinkPriceOracleProxy", c.CHAINLINK_PRICE_ORACLE_PROXY_ADDRESS, timelockSigner);
   })
 
   it("Should have timelock as admin", async function() {
@@ -66,10 +69,8 @@ describe("pUSDC", function() {
   });
 
   it("Can replace old market in comptroller", async function(){
-    // const pUSDC_bricked = await hre.ethers.getContractAt("CTokenInterface", BRICKED_PUSDC_ADDRESS);
-    const comptroller = await hre.ethers.getContractAt("InsolventComptroller", c.UNITROLLER_ADDRESS, timelockSigner);
-    tx = await comptroller._replaceMarket(new_pUSDC.address, c.BRICKED_PUSDC_ADDRESS, c.PUSDC_ACCOUNTS)
-    await tx.wait()
+    await chainlinkPriceOracle.setTokenConfigs([new_pUSDC.address], [c.USDC_CHAINLINE_AGGREGATOR_ADDRESS], [2], [6])
+    await comptroller._replaceMarket(new_pUSDC.address, c.BRICKED_PUSDC_ADDRESS, c.PUSDC_ACCOUNTS)
 
     const newMarket = await comptroller.markets(new_pUSDC.address)
     const oldMarket = await comptroller.markets(c.BRICKED_PUSDC_ADDRESS)
@@ -81,25 +82,46 @@ describe("pUSDC", function() {
     expect(await comptroller.borrowGuardianPaused(new_pUSDC.address)).to.be.true
   })
 
-  it("Borrower can repay loan", async function() {
-    const lockedUSDCBorrower = "0xda248cC10b477C1144219183EC87b0621DAC37b3"
+  it("Borrowers can repay", async function() {
+    const usdcMegaHolderSigner = await impersonateAccount("0xBE0eB53F46cd790Cd13851d5EFf43D12404d33E8") // just an account with a lot of usdc (binance in this case)
     const usdc = await hre.ethers.getContractAt(USDC_ABI, c.USDC_ADDRESS)
-    const borrowed = await new_pUSDC.borrowBalanceStored(lockedUSDCBorrower);
-    let hasEnough = expect((await usdc.balanceOf(lockedUSDCBorrower)).gte(borrowed)).to.be.true
-    if(hasEnough == Assertion.false)
-      throw new Error("the example locked usdc borrower does not have enough funds to repay the loan. find another borrower that does or workout how to fake mint usdc to the borrower.")
 
-    const lockedUSDCSigner = await impersonateAccount(lockedUSDCBorrower)
+    async function repayLoan(account){
+      const borrowed = await new_pUSDC.borrowBalanceStored(account);
+      if(borrowed.eq(Zero)) return
+      // send enough usdc to account so they can repay loan
+      await usdc.connect(usdcMegaHolderSigner).transfer(account, borrowed)
+      const signer = await impersonateAccount(account)
+      await usdc.connect(signer).approve(new_pUSDC.address, c.MAX_INT)
+      await new_pUSDC.connect(signer).repayBorrow(borrowed)
+      const finalBorrowBalance = await new_pUSDC.borrowBalanceStored(account)
+      expect(finalBorrowBalance.lt(borrowed)).to.be.true
+    }
+    await Promise.all(c.PUSDC_ACCOUNTS.map(async a=>(await repayLoan(a))))
+  });
 
-    tx = await usdc.connect(lockedUSDCSigner).approve(new_pUSDC.address, c.MAX_INT)
-    await tx.wait()
+  it("Repaid funds can be redeemed by suppliers", async function() {
+    const usdc = await hre.ethers.getContractAt(USDC_ABI, c.USDC_ADDRESS)
+    console.log("total underlying usdc: ", await usdc.balanceOf(new_pUSDC.address))
+    console.log(await chainlinkPriceOracle.getUnderlyingPrice(new_pUSDC.address));
+    async function redeem(account){
+      const collat = await new_pUSDC.balanceOf(account);
+      if(collat.eq(Zero)) return
 
-    tx = await new_pUSDC.connect(lockedUSDCSigner).repayBorrow(borrowed)
-    await tx.wait()
+      const [err, liquidity, shortfall] = await comptroller.getAccountLiquidity(account)
+      // if(liquidity.eq(Zero)) return
+      // console.log(`${account} collat   : ${collat}`)
+      // console.log(`${account} liquidity: ${liquidity}`)
 
-    const finalBorrowBalance = await new_pUSDC.borrowBalanceStored(lockedUSDCBorrower)
+      // const signer = await impersonateAccount(account)
+      // await new_pUSDC.connect(signer).redeem(collat)
+    }
+    await Promise.all(c.PUSDC_ACCOUNTS.map(async a=>(await redeem(a))))
 
-    expect(finalBorrowBalance.lt(borrowed)).to.be.true
+  });
+
+  it("Repaid account can withdraw", async function() {
+
   });
 
 });
