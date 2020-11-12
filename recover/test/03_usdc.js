@@ -102,21 +102,37 @@ describe("pUSDC", function() {
 
   it("Repaid funds can be redeemed by suppliers", async function() {
     const usdc = await hre.ethers.getContractAt(USDC_ABI, c.USDC_ADDRESS)
-    console.log("total underlying usdc: ", await usdc.balanceOf(new_pUSDC.address))
-    console.log(await chainlinkPriceOracle.getUnderlyingPrice(new_pUSDC.address));
+    const totalUnderlyingStart = await usdc.balanceOf(new_pUSDC.address)
+    console.log("START total underlying usdc: ", totalUnderlyingStart)
+    console.log("chainlink oracle price", await chainlinkPriceOracle.getUnderlyingPrice(new_pUSDC.address));
     async function redeem(account){
       const collat = await new_pUSDC.balanceOf(account);
       if(collat.eq(Zero)) return
+      let err,liquidity,shortfall
 
-      const [err, liquidity, shortfall] = await comptroller.getAccountLiquidity(account)
+      // some accounts cause a revert
+      try {
+        [err, liquidity, shortfall] = await comptroller.getAccountLiquidity(account)
+      } catch(e){
+        console.log(`getAccountLiquidity reverted for ${account}`)
+        return
+      }
       // if(liquidity.eq(Zero)) return
       // console.log(`${account} collat   : ${collat}`)
       // console.log(`${account} liquidity: ${liquidity}`)
 
-      // const signer = await impersonateAccount(account)
-      // await new_pUSDC.connect(signer).redeem(collat)
+      const signer = await impersonateAccount(account)
+      await new_pUSDC.connect(signer).redeem(collat)
+      // await tx.wait()
+      // console.log(await new_pUSDC.balanceOf(account));
+
     }
+    // await Promise.all(c.PUSDC_ACCOUNTS.map(async a=>(await redeem(a))))
+
     await Promise.all(c.PUSDC_ACCOUNTS.map(async a=>(await redeem(a))))
+    const totalUnderlyingEnd = await usdc.balanceOf(new_pUSDC.address)
+    console.log("END total underlying usdc: ", totalUnderlyingEnd)
+    // await redeem(c.PUSDC_ACCOUNTS[c.PUSDC_ACCOUNTS.length-1])
 
   });
 
