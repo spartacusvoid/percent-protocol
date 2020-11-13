@@ -5,8 +5,7 @@ const { BigNumber } = ethers;
 
 const impersonateAccount = async address => {
   const [account1] = await ethers.getSigners()
-  const tx = await account1.sendTransaction({to: address, value: ethers.utils.parseEther("1.0")})
-  await tx.wait()
+  await account1.sendTransaction({to: address, value: ethers.utils.parseEther("1.0")})
   await hre.network.provider.request({
     method: "hardhat_impersonateAccount",
     params: [address]

@@ -1,8 +1,7 @@
-const { BigNumber } = require('ethers');
-const { Assertion, expect } = require("chai");
+const { expect } = require("chai");
 const c = require("../constants");
 const { impersonateAccount, deployComptroller } = require("../utils");
-let tx, timelockSigner
+let timelockSigner
 
 before(async function(){
   timelockSigner = await impersonateAccount(c.TIMELOCK_ADDRESS)

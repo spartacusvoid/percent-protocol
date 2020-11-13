@@ -1,20 +1,16 @@
-const { Assertion, expect } = require("chai");
+const { expect } = require("chai");
 const c = require("../constants");
-const { impersonateAccount, deployCErc20 } = require("../utils");
-const USDC_ABI = require("../usdc_abi");
-const { Zero } = ethers.constants
-let tx, timelockSigner, new_pUSDC, old_pUSDC, comptroller, chainlinkPriceOracle
+const { impersonateAccount, deployCErc20, deployComptroller } = require("../utils");
+let timelockSigner, new_pUSDC, old_pUSDC, comptroller, chainlinkPriceOracle
 
 before(async function(){
   timelockSigner = await impersonateAccount(c.TIMELOCK_ADDRESS)
 })
 
 describe("pUSDC", function() {
-  let new_pUSDC
   before(async function(){
     old_pUSDC = await ethers.getContractAt("CTokenInterface", c.BRICKED_PUSDC_ADDRESS)
-    new_pUSDC = await deployCErc20(c.USDC_ADDRESS, "Percent USDC", "pUSDC", await old_pUSDC.reserveFactorMantissa(), timelockSigner)
-    comptroller = await hre.ethers.getContractAt("InsolventComptroller", c.UNITROLLER_ADDRESS, timelockSigner);
+    new_pUSDC = await deployCErc20(c.USDC_ADDRESS, "Percent USDC", "pUSDC", await old_pUSDC.reserveFactorMantissa(), timelockSigner);
     chainlinkPriceOracle = await hre.ethers.getContractAt("ChainlinkPriceOracleProxy", c.CHAINLINK_PRICE_ORACLE_PROXY_ADDRESS, timelockSigner);
   })
 
@@ -24,8 +20,7 @@ describe("pUSDC", function() {
 
   it("Can Initialise correct balances", async function() {
     expect(await new_pUSDC.totalSupply() == 0).to.equal(true);
-    tx = await new_pUSDC.specialInitState(c.BRICKED_PUSDC_ADDRESS, c.PUSDC_ACCOUNTS);
-    await tx.wait()
+    await new_pUSDC.specialInitState(c.BRICKED_PUSDC_ADDRESS, c.PUSDC_ACCOUNTS);
 
     await new_pUSDC.accrueInterest();
 
@@ -67,5 +62,4 @@ describe("pUSDC", function() {
     expect(1 - newTopBalance / oldTopBalance).to.be.closeTo(hairCut, 0.01);
 
   });
-
 });
