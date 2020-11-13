@@ -67,8 +67,26 @@ const deployCEther = async (name, symbol, reserveFactor, adminSigner) => {
   return cEther
 }
 
+const deployComptroller = async (timelockSigner) => {
+  const InsolventComptroller = await hre.ethers.getContractFactory("InsolventComptroller", timelockSigner);
+  const comptrollerReplacement = await InsolventComptroller.deploy();
+  await comptrollerReplacement.deployed();
+  const unitroller = await hre.ethers.getContractAt("Unitroller", c.UNITROLLER_ADDRESS, timelockSigner);
+  await unitroller._setPendingImplementation(comptrollerReplacement.address);
+  await comptrollerReplacement._become(c.UNITROLLER_ADDRESS);
+  const comptroller = await hre.ethers.getContractAt("InsolventComptroller", c.UNITROLLER_ADDRESS, timelockSigner);
+
+  await comptroller._setCloseFactor(BigNumber.from("1000000000000000000")); //100%
+  await comptroller._setMaxAssets(20);
+  await comptroller._setLiquidationIncentive(BigNumber.from("1000000000000000000")); //100%
+  await comptroller._setSeizePaused(true);
+  await comptroller._setTransferPaused(true);
+  return { comptroller, comptrollerReplacement };
+}
+
 module.exports = {
   impersonateAccount,
   deployCErc20,
-  deployCEther
+  deployCEther,
+  deployComptroller
 }
