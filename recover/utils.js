@@ -5,8 +5,7 @@ const { BigNumber } = ethers;
 
 const impersonateAccount = async address => {
   const [account1] = await ethers.getSigners()
-  const tx = await account1.sendTransaction({to: address, value: ethers.utils.parseEther("1.0")})
-  await tx.wait()
+  await account1.sendTransaction({to: address, value: ethers.utils.parseEther("1.0")})
   await hre.network.provider.request({
     method: "hardhat_impersonateAccount",
     params: [address]
@@ -67,8 +66,25 @@ const deployCEther = async (name, symbol, reserveFactor, adminSigner) => {
   return cEther
 }
 
+const deployComptroller = async (timelockSigner) => {
+  const InsolventComptroller = await hre.ethers.getContractFactory("InsolventComptroller", timelockSigner);
+  const comptrollerReplacement = await InsolventComptroller.deploy();
+  await comptrollerReplacement.deployed();
+  const unitroller = await hre.ethers.getContractAt("Unitroller", c.UNITROLLER_ADDRESS, timelockSigner);
+  await unitroller._setPendingImplementation(comptrollerReplacement.address);
+  await comptrollerReplacement._become(c.UNITROLLER_ADDRESS);
+  const comptroller = await hre.ethers.getContractAt("InsolventComptroller", c.UNITROLLER_ADDRESS, timelockSigner);
+
+  await comptroller._setCloseFactor(BigNumber.from("1000000000000000000")); //100%
+  await comptroller._setLiquidationIncentive(BigNumber.from("1000000000000000000")); //100%
+  await comptroller._setSeizePaused(true);
+  await comptroller._setTransferPaused(true);
+  return { comptroller, comptrollerReplacement };
+}
+
 module.exports = {
   impersonateAccount,
   deployCErc20,
-  deployCEther
+  deployCEther,
+  deployComptroller
 }

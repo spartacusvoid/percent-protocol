@@ -1,9 +1,7 @@
 const { expect } = require("chai");
 const c = require("../constants");
-const { impersonateAccount, deployCErc20, deployCEther } = require("../utils");
-let abi = require("../abi.json");
-let addresses = require("../addresses.json");
-let tx, timelockSigner, old_pETH, new_pETH
+const { impersonateAccount, deployCEther, deployComptroller } = require("../utils");
+let timelockSigner, old_pETH, new_pETH
 
 before(async function(){
   timelockSigner = await impersonateAccount(c.TIMELOCK_ADDRESS)
@@ -21,8 +19,7 @@ describe("pETH", function() {
 
   it("Can Initialise correct balances", async function() {
     expect(await new_pETH.totalSupply() == 0).to.equal(true);
-    tx = await new_pETH.specialInitState(c.BRICKED_PETH_ADDRESS, c.PETH_ACCOUNTS);
-    await tx.wait()
+    await new_pETH.specialInitState(c.BRICKED_PETH_ADDRESS, c.PETH_ACCOUNTS);
 
     await new_pETH.accrueInterest();
 
@@ -49,36 +46,4 @@ describe("pETH", function() {
 
     expect(newTopBalance / oldTopBalance).to.be.closeTo(hairCut, 0.01);
   })
-
-  it("Can replace old market in comptroller", async function(){
-    // const pUSDC_bricked = await hre.ethers.getContractAt("CTokenInterface", BRICKED_PUSDC_ADDRESS);
-    const comptroller = await hre.ethers.getContractAt("InsolventComptroller", c.UNITROLLER_ADDRESS, timelockSigner);
-    tx = await comptroller._replaceMarket(new_pETH.address, c.BRICKED_PETH_ADDRESS, c.PUSDC_ACCOUNTS)
-    await tx.wait()
-
-    const newMarket = await comptroller.markets(new_pETH.address)
-    const oldMarket = await comptroller.markets(c.BRICKED_PETH_ADDRESS)
-
-    expect(newMarket.isListed).to.be.true
-    expect(oldMarket.isListed).to.be.false
-
-    expect(await comptroller.mintGuardianPaused(new_pETH.address)).to.be.true
-    expect(await comptroller.borrowGuardianPaused(new_pETH.address)).to.be.true
-
-    // addresses.workingTokens.forEach(async t => {
-    //   const token = new ethers.Contract(t.address, abi.CTOKEN_ABI, timelockSigner);
-    //   await token._setComptroller(comptroller.address);
-    //
-    //   await comptroller._supportMarket(t.address);
-    //   await comptroller._setMintPaused(t.address, true);
-    //   await comptroller._setBorrowPaused(t.address, true);
-    //   await token.accrueInterest();
-    // });
-    //
-    // const old_comptroller = new ethers.Contract(addresses.unitroller, abi.COMPTROLLER_ABI, timelockSigner);
-    //
-    // console.log(await old_comptroller.getAssetsIn(addresses.yfiLender));
-    // console.log(await old_comptroller.getAccountLiquidity(addresses.yfiLender));
-  })
-
 });
