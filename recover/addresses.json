@@ -33,6 +33,9 @@
       { "name" : "pTUSD", "address": "0x290052F9074D64F06D4740F42C48168151BFB938" },
       { "name" : "pBUSD", "address": "0x1136568622c6fb3B768385C98167B2A0B27658ab" }
     ],
+    "wbtcAccounts" : [
+      "0x87616fA850c87a78f307878f32D808dad8f4d401"
+    ],
     "ethAccounts" : [
       "0xFb626333099A91Ab677BCd5e9C71bc4Dbe0238a8",
       "0x0489076A0D17394835aF93cd62ACFf703B6814a9",
