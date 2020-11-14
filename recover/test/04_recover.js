@@ -10,16 +10,17 @@ before(async function(){
   timelockSigner = await impersonateAccount(c.TIMELOCK_ADDRESS);
   const {c1, _ } = await deployComptroller(timelockSigner);
   comptroller = c1;
-  old_pUSDC = await ethers.getContractAt("CTokenInterface", c.BRICKED_PUSDC_ADDRESS);
+  old_pUSDC = await hre.ethers.getContractAt("CTokenInterface", c.BRICKED_PUSDC_ADDRESS);
   new_pUSDC = await deployCErc20(c.USDC_ADDRESS, "Percent USDC", "pUSDC", await old_pUSDC.reserveFactorMantissa(), timelockSigner);
-  old_pETH = await ethers.getContractAt("CTokenInterface", c.BRICKED_PETH_ADDRESS);
+  old_pETH = await hre.ethers.getContractAt("CTokenInterface", c.BRICKED_PETH_ADDRESS);
   new_pETH = await deployCEther("Percent Ether", "pETH", await old_pETH.reserveFactorMantissa(), timelockSigner);
   comptroller = await hre.ethers.getContractAt("InsolventComptroller", c.UNITROLLER_ADDRESS, timelockSigner);
   chainlinkPriceOracle = await hre.ethers.getContractAt("ChainlinkPriceOracleProxy", c.CHAINLINK_PRICE_ORACLE_PROXY_ADDRESS, timelockSigner);
   await new_pUSDC.specialInitState(c.BRICKED_PUSDC_ADDRESS, c.PUSDC_ACCOUNTS);
+  await new_pETH.specialInitState(c.BRICKED_PETH_ADDRESS, c.PETH_ACCOUNTS);
   await chainlinkPriceOracle.setTokenConfigs(
       [new_pUSDC.address, new_pETH.address], 
-      [c.ETH_CHAINLINK_AGGREGATOR_ADDRESS, c.USDC_CHAINLINK_AGGREGATOR_ADDRESS], 
+      [c.USDC_CHAINLINK_AGGREGATOR_ADDRESS, c.ETH_CHAINLINK_AGGREGATOR_ADDRESS], 
       [2,1],
       [6,18]);
   await comptroller._replaceMarket(new_pUSDC.address, c.BRICKED_PUSDC_ADDRESS, c.PUSDC_ACCOUNTS);
@@ -37,7 +38,7 @@ async function repayUsdcLoan(account){
     await usdc.connect(signer).approve(new_pUSDC.address, c.MAX_INT)
     await new_pUSDC.connect(signer).repayBorrow(borrowed)
     const finalBorrowBalance = await new_pUSDC.borrowBalanceStored(account)
-    expect(finalBorrowBalance.lt(borrowed)).to.be.true
+    expect(finalBorrowBalance / 1e18).to.be.closeTo(0, 0.001);
 }
 
 async function repayEthLoan(account){
@@ -45,10 +46,11 @@ async function repayEthLoan(account){
     if(borrowed.eq(Zero)) return
     // send enough ETH to account so they can repay loan
     const [account1] = await ethers.getSigners()
-    await account1.sendTransaction({to: account, value: borrowed})
-    await new_pETH.connect(signer).repayBorrow(borrowed)
+    await account1.sendTransaction({to: account, value: borrowed});
+    const signer = await impersonateAccount(account)
+    await new_pETH.connect(signer).repayBorrow({ value : borrowed});
     const finalBorrowBalance = await new_pETH.borrowBalanceStored(account)
-    expect(finalBorrowBalance.lt(borrowed)).to.be.true
+    expect(finalBorrowBalance / 1e18).to.be.closeTo(0, 0.001);
 }
 
 async function redeem(pToken, account){
@@ -109,7 +111,7 @@ describe("Recovery", function () {
     it("ETH Repaid funds can be redeemed by suppliers", async function() {
         const totalUnderlyingStart = await hre.ethers.provider.getBalance(new_pETH.address) / 1e18;
         console.log("START total underlying ETH: ", totalUnderlyingStart);
-        const ethPrice =await chainlinkPriceOracle.getUnderlyingPrice(new_pETH.address) / 1e30;
+        const ethPrice =await chainlinkPriceOracle.getUnderlyingPrice(new_pETH.address) / 1e18;
         console.log(`Chainlink oracle price: $${ethPrice}`); 
 
         await Promise.all(c.PETH_ACCOUNTS.map(repayEthLoan));
