@@ -10,20 +10,25 @@ before(async function(){
   timelockSigner = await impersonateAccount(c.TIMELOCK_ADDRESS);
   const {c1, _ } = await deployComptroller(timelockSigner);
   comptroller = c1;
-  old_pUSDC = await ethers.getContractAt("CTokenInterface", c.BRICKED_PUSDC_ADDRESS);
+  old_pUSDC = await hre.ethers.getContractAt("CTokenInterface", c.BRICKED_PUSDC_ADDRESS);
   new_pUSDC = await deployCErc20(c.USDC_ADDRESS, "Percent USDC", "pUSDC", await old_pUSDC.reserveFactorMantissa(), timelockSigner);
-  old_pETH = await ethers.getContractAt("CTokenInterface", c.BRICKED_PETH_ADDRESS);
+  old_pETH = await hre.ethers.getContractAt("CTokenInterface", c.BRICKED_PETH_ADDRESS);
   new_pETH = await deployCEther("Percent Ether", "pETH", await old_pETH.reserveFactorMantissa(), timelockSigner);
+  old_pWBTC = await hre.ethers.getContractAt("CTokenInterface", c.BRICKED_PWBTC_ADDRESS);
+  new_pWBTC = await deployCErc20(c.WBTC_ADDRESS, "Percent WBTC", "pWBTC", await old_pWBTC.reserveFactorMantissa(), timelockSigner);
   comptroller = await hre.ethers.getContractAt("InsolventComptroller", c.UNITROLLER_ADDRESS, timelockSigner);
   chainlinkPriceOracle = await hre.ethers.getContractAt("ChainlinkPriceOracleProxy", c.CHAINLINK_PRICE_ORACLE_PROXY_ADDRESS, timelockSigner);
   await new_pUSDC.specialInitState(c.BRICKED_PUSDC_ADDRESS, c.PUSDC_ACCOUNTS);
+  await new_pETH.specialInitState(c.BRICKED_PETH_ADDRESS, c.PETH_ACCOUNTS);
+  await new_pWBTC.specialInitState(c.BRICKED_PWBTC_ADDRESS, c.PWBTC_ACCOUNTS);
   await chainlinkPriceOracle.setTokenConfigs(
-      [new_pUSDC.address, new_pETH.address], 
-      [c.ETH_CHAINLINK_AGGREGATOR_ADDRESS, c.USDC_CHAINLINK_AGGREGATOR_ADDRESS], 
-      [2,1],
-      [6,18]);
+      [new_pUSDC.address, new_pETH.address, new_pWBTC.address], 
+      [c.USDC_CHAINLINK_AGGREGATOR_ADDRESS, c.ETH_CHAINLINK_AGGREGATOR_ADDRESS, c.WBTC_CHAINLINK_AGGREGATOR_ADDRESS], 
+      [2,1,1],
+      [6,18,8]);
   await comptroller._replaceMarket(new_pUSDC.address, c.BRICKED_PUSDC_ADDRESS, c.PUSDC_ACCOUNTS);
   await comptroller._replaceMarket(new_pETH.address, c.BRICKED_PETH_ADDRESS, c.PETH_ACCOUNTS);
+  await comptroller._replaceMarket(new_pWBTC.address, c.BRICKED_PWBTC_ADDRESS, c.PWBTC_ACCOUNTS);
   usdcMegaHolderSigner = await impersonateAccount("0xBE0eB53F46cd790Cd13851d5EFf43D12404d33E8") // just an account with a lot of usdc (binance in this case)
   usdc = await hre.ethers.getContractAt(USDC_ABI, c.USDC_ADDRESS)
 })
@@ -37,7 +42,7 @@ async function repayUsdcLoan(account){
     await usdc.connect(signer).approve(new_pUSDC.address, c.MAX_INT)
     await new_pUSDC.connect(signer).repayBorrow(borrowed)
     const finalBorrowBalance = await new_pUSDC.borrowBalanceStored(account)
-    expect(finalBorrowBalance.lt(borrowed)).to.be.true
+    expect(finalBorrowBalance / 1e18).to.be.closeTo(0, 0.001);
 }
 
 async function repayEthLoan(account){
@@ -45,10 +50,11 @@ async function repayEthLoan(account){
     if(borrowed.eq(Zero)) return
     // send enough ETH to account so they can repay loan
     const [account1] = await ethers.getSigners()
-    await account1.sendTransaction({to: account, value: borrowed})
-    await new_pETH.connect(signer).repayBorrow(borrowed)
+    await account1.sendTransaction({to: account, value: borrowed});
+    const signer = await impersonateAccount(account)
+    await new_pETH.connect(signer).repayBorrow({ value : borrowed});
     const finalBorrowBalance = await new_pETH.borrowBalanceStored(account)
-    expect(finalBorrowBalance.lt(borrowed)).to.be.true
+    expect(finalBorrowBalance / 1e18).to.be.closeTo(0, 0.001);
 }
 
 async function redeem(pToken, account){
@@ -90,6 +96,17 @@ describe("Recovery", function () {
         expect(await comptroller.mintGuardianPaused(new_pUSDC.address)).to.be.true;
         expect(await comptroller.borrowGuardianPaused(new_pUSDC.address)).to.be.true;
     });
+  
+    it("Can replace WBTC market in comptroller", async function(){
+        const newMarket = await comptroller.markets(new_pWBTC.address);
+        const oldMarket = await comptroller.markets(c.BRICKED_PWBTC_ADDRESS);
+  
+        expect(newMarket.isListed).to.be.true;
+        expect(oldMarket.isListed).to.be.false;
+  
+        expect(await comptroller.mintGuardianPaused(new_pWBTC.address)).to.be.true;
+        expect(await comptroller.borrowGuardianPaused(new_pWBTC.address)).to.be.true;
+    });
 
     it("USDC Repaid funds can be redeemed by suppliers", async function() {
         const usdc = await hre.ethers.getContractAt(USDC_ABI, c.USDC_ADDRESS)
@@ -109,7 +126,7 @@ describe("Recovery", function () {
     it("ETH Repaid funds can be redeemed by suppliers", async function() {
         const totalUnderlyingStart = await hre.ethers.provider.getBalance(new_pETH.address) / 1e18;
         console.log("START total underlying ETH: ", totalUnderlyingStart);
-        const ethPrice =await chainlinkPriceOracle.getUnderlyingPrice(new_pETH.address) / 1e30;
+        const ethPrice =await chainlinkPriceOracle.getUnderlyingPrice(new_pETH.address) / 1e18;
         console.log(`Chainlink oracle price: $${ethPrice}`); 
 
         await Promise.all(c.PETH_ACCOUNTS.map(repayEthLoan));
@@ -119,4 +136,14 @@ describe("Recovery", function () {
         const totalUnderlyingEnd = await hre.ethers.provider.getBalance(new_pETH.address) / 1e18;
         console.log("END total underlying ETH: ", totalUnderlyingEnd)
     });
+
+    it("New wBTC has no balance, no supply and no borrows", async function() {
+        const wbtc = await hre.ethers.getContractAt(USDC_ABI, c.WBTC_ADDRESS)
+        const totalUnderlyingStart = await usdc.balanceOf(new_pWBTC.address) / 1e8;
+        expect(totalUnderlyingStart).to.equal(0);
+        const totalSupply = await new_pWBTC.totalSupply() / 1e8;
+        expect(totalSupply).to.equal(0);
+        const totalBorrows = await new_pWBTC.totalBorrows() / 1e8;
+        expect(totalBorrows).to.equal(0);
+    })
 });

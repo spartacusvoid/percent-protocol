@@ -75,7 +75,7 @@ const deployComptroller = async (timelockSigner) => {
   await comptrollerReplacement._become(c.UNITROLLER_ADDRESS);
   const comptroller = await hre.ethers.getContractAt("InsolventComptroller", c.UNITROLLER_ADDRESS, timelockSigner);
 
-  await comptroller._setCloseFactor(BigNumber.from("1000000000000000000")); //100%
+  await comptroller._setCloseFactor(BigNumber.from("900000000000000000")); //90% is the max
   await comptroller._setLiquidationIncentive(BigNumber.from("1000000000000000000")); //100%
   await comptroller._setSeizePaused(true);
   await comptroller._setTransferPaused(true);
