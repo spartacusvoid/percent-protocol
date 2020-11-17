@@ -4,8 +4,6 @@ pragma solidity ^0.5.16;
 import "../CToken.sol";
 import "../SafeMath.sol";
 
-import "hardhat/console.sol";
-
 /**
  * @title Percent's InsolventCErc20 Contract
  * @notice CTokens which wrap an EIP-20 underlying
@@ -45,14 +43,9 @@ contract InsolventCErc20 is CToken, CErc20Interface {
 
     bool private _initState = false;
 
-    function specialInitState(address original, address[] memory accounts) public {
+    function _specialInitState(address original, address[] memory accounts) public {
         require(!_initState, "may only _initState once");
-        require(msg.sender == admin, "only admin may run specialInitState");
-
-        CTokenInterface originalToken = CTokenInterface(original);
-        console.log("Original totalBorrows: %s", originalToken.totalBorrows());
-        console.log("Original totalSupply: %s", originalToken.totalSupply());
-        console.log("Original exchangeRateStored: %s", originalToken.exchangeRateStored());
+        require(msg.sender == admin, "only admin may run _specialInitState");
 
         //We need to calculate the total negative and positive outlay after accounting for wash lending
         //These sums are required in the next loop to calculate each account's position
@@ -78,8 +71,6 @@ contract InsolventCErc20 is CToken, CErc20Interface {
                                     totalPositiveOutlay);
 
         uint multiplier = SafeMath.sub(1e18, hairCut);
-
-        console.log("Haircut: %s", hairCut);
 
         for (uint8 i = 0; i < accounts.length; i++) {
           address account = accounts[i];
@@ -115,12 +106,6 @@ contract InsolventCErc20 is CToken, CErc20Interface {
           }
         }
 
-        console.log("New totalBorrows: %s", totalBorrows);
-        console.log("New totalSupply: %s", totalSupply);
-        uint exchangeRate = exchangeRateStored();
-        console.log("New exchangeRateStored: %s", exchangeRate);
-        uint underlying = SafeMath.div(SafeMath.mul(totalSupply, exchangeRate), 1e24);
-        console.log("New underlying: %s", underlying);
         _initState = true;
     }
 

@@ -20,7 +20,7 @@ describe("pUSDC", function() {
 
   it("Can Initialise correct balances", async function() {
     expect(await new_pUSDC.totalSupply() == 0).to.equal(true);
-    await new_pUSDC.specialInitState(c.BRICKED_PUSDC_ADDRESS, c.PUSDC_ACCOUNTS);
+    await new_pUSDC._specialInitState(c.BRICKED_PUSDC_ADDRESS, c.PUSDC_ACCOUNTS);
 
     await new_pUSDC.accrueInterest();
 

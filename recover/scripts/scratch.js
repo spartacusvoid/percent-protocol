@@ -43,7 +43,7 @@ async function main() {
 
   await pUsdc.deployed();
   pUsdc = await hre.ethers.getContractAt("InsolventCErc20", pUsdc.address, timelockSigner);
-  tx = await pUsdc.specialInitState(BRICKED_PUSDC_ADDRESS, BRICKED_PUSDC_HOLDERS, BRICKED_PUSDC_BORROWERS);
+  tx = await pUsdc._specialInitState(BRICKED_PUSDC_ADDRESS, BRICKED_PUSDC_HOLDERS, BRICKED_PUSDC_BORROWERS);
   await tx.wait()
 
   // const chainlinkPriceOracle = await hre.ethers.getContractAt("ChainlinkPriceOracleProxy", CHAINLINK_PRICE_ORACLE_PROXY_ADDRESS);
