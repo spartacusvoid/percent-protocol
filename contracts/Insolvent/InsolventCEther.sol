@@ -173,6 +173,8 @@ contract InsolventCEther is CToken {
         require(!_initState, "may only _initState once");
         require(msg.sender == admin, "only admin may run _specialInitState");
 
+        reserveFactorMantissa = CTokenInterface(original).reserveFactorMantissa();
+
         //We need to calculate the total negative and positive outlay after accounting for wash lending
         //These sums are required in the next loop to calculate each account's position
         uint totalPositiveOutlay = 0;

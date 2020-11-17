@@ -4,7 +4,7 @@ const c = require("../constants");
 const abi = require("../abi");
 const addresses = require("../addresses.json");
 const { impersonateAccount, redeem, repayEthLoan, repayUsdcLoan } = require("../utils");
-const { deployments } = require("hardhat");
+const { deployments, ethers } = require("hardhat");
 const BigNumber = hre.ethers.BigNumber;
 const USDC_ABI = require("../usdc_abi.json");
 
@@ -14,49 +14,69 @@ let timelockSigner, multiSigSigner,
     usdcMegaHolderSigner, usdc
 
 before(async function () {
-  await deployments.fixture();
   timelockSigner = await impersonateAccount(c.TIMELOCK_ADDRESS);
   multiSigSigner = await impersonateAccount(c.MULTISIG_ADDRESS);
-  const comptrollerReplacement = await ethers.getContract('InsolventComptroller');
+
   const unitroller = await ethers.getContractAt("Unitroller", c.UNITROLLER_ADDRESS, timelockSigner);
+  old_pWBTC = await ethers.getContractAt(abi.CTOKEN_ABI, c.BRICKED_PWBTC_ADDRESS);
+  old_pUSDC = await ethers.getContractAt(abi.CTOKEN_ABI, c.BRICKED_PUSDC_ADDRESS);
+  old_pETH = await ethers.getContractAt(abi.CTOKEN_ABI, c.BRICKED_PETH_ADDRESS);
+  const oldComptroller = await ethers.getContractAt("Comptroller", c.UNITROLLER_ADDRESS, multiSigSigner);
+  chainlinkPriceOracle = await ethers.getContractAt("ChainlinkPriceOracleProxy", c.CHAINLINK_PRICE_ORACLE_PROXY_ADDRESS, timelockSigner);
+
+  //Phase A
+
+  //Change unitroller and chainlink admin to multisig
   await unitroller._setPendingAdmin(c.MULTISIG_ADDRESS);
   await unitroller.connect(multiSigSigner)._acceptAdmin();
-  chainlinkPriceOracle = await ethers.getContractAt("ChainlinkPriceOracleProxy", c.CHAINLINK_PRICE_ORACLE_PROXY_ADDRESS, timelockSigner);
   await chainlinkPriceOracle.transferOwnership(c.MULTISIG_ADDRESS);
+
+  //Set various parameters
+  await oldComptroller._setCloseFactor(BigNumber.from("900000000000000000")); //90% is the max
+  await oldComptroller._setLiquidationIncentive(BigNumber.from("1000000000000000000")); //100%
+  await oldComptroller._setSeizePaused(true);
+  await oldComptroller._setTransferPaused(true);
+
+  //Phase B
+
+  //Deploys the contracts in deploy_script.ts
+  //Comptroller, InsolventCEther, 2x InsolventCErc20Delegate, 2x InsolventCErc20Delegator
+  await deployments.fixture();
+  
+  //Phase C
+  
   console.log("Changing implementation");
-  await unitroller.connect(multiSigSigner)._setPendingImplementation(comptrollerReplacement.address);
+  //Transfer unitroller to new implementation
+  const comptrollerReplacement = await ethers.getContract('InsolventComptroller');
+  await unitroller.connect(multiSigSigner)._setPendingImplementation(comptrollerReplacement.address);     //Tx 1
   await comptrollerReplacement.connect(multiSigSigner)._become(c.UNITROLLER_ADDRESS);
-  comptroller = await ethers.getContractAt("InsolventComptroller", c.UNITROLLER_ADDRESS, multiSigSigner);
-  console.log("Setting comptroller parameters");
-  await comptroller._setCloseFactor(BigNumber.from("900000000000000000")); //90% is the max
-  await comptroller._setLiquidationIncentive(BigNumber.from("1000000000000000000")); //100%
-  await comptroller._setSeizePaused(true);
-  await comptroller._setTransferPaused(true);
+  comptroller = await ethers.getContractAt("InsolventComptroller", c.UNITROLLER_ADDRESS, multiSigSigner); //Tx 2
+
   let new_pUSDC_address = (await ethers.getContract('pUSDC')).address
   new_pUSDC = await ethers.getContractAt("InsolventCErc20", new_pUSDC_address, multiSigSigner);
-  old_pUSDC = await ethers.getContractAt(abi.CTOKEN_ABI, c.BRICKED_PUSDC_ADDRESS);
-  await new_pUSDC._setReserveFactor(await old_pUSDC.reserveFactorMantissa());
   let new_pWBTC_address = (await ethers.getContract('pWBTC')).address
   new_pWBTC = await ethers.getContractAt("InsolventCErc20", new_pWBTC_address, multiSigSigner);
-  old_pWBTC = await ethers.getContractAt(abi.CTOKEN_ABI, c.BRICKED_PWBTC_ADDRESS);
-  await new_pWBTC._setReserveFactor(await old_pWBTC.reserveFactorMantissa());
   new_pETH = await ethers.getContract('pETH', multiSigSigner);
-  old_pETH = await ethers.getContractAt(abi.CTOKEN_ABI, c.BRICKED_PETH_ADDRESS);
-  await new_pETH._setReserveFactor(await old_pETH.reserveFactorMantissa());
+
   console.log("Initializing token state");
-  await new_pUSDC._specialInitState(c.BRICKED_PUSDC_ADDRESS, c.PUSDC_ACCOUNTS);
-  await new_pETH._specialInitState(c.BRICKED_PETH_ADDRESS, c.PETH_ACCOUNTS);
-  await new_pWBTC._specialInitState(c.BRICKED_PWBTC_ADDRESS, c.PWBTC_ACCOUNTS);
+  //Set reserve factors and apply the haircut
+  await new_pUSDC._specialInitState(c.BRICKED_PUSDC_ADDRESS, c.PUSDC_ACCOUNTS);                           //Tx 3
+  await new_pETH._specialInitState(c.BRICKED_PETH_ADDRESS, c.PETH_ACCOUNTS);                              //Tx 4
+  await new_pWBTC._specialInitState(c.BRICKED_PWBTC_ADDRESS, c.PWBTC_ACCOUNTS);                           //Tx 5
+
+  //Configure the price oracle for the 3 new tokens
   console.log("Setting Chainlink token configs");
-  await chainlinkPriceOracle.connect(multiSigSigner).setTokenConfigs(
+  await chainlinkPriceOracle.connect(multiSigSigner).setTokenConfigs(                                     //Tx 6
       [new_pUSDC.address, new_pETH.address, new_pWBTC.address], 
       [c.USDC_CHAINLINK_AGGREGATOR_ADDRESS, c.ETH_CHAINLINK_AGGREGATOR_ADDRESS, c.WBTC_CHAINLINK_AGGREGATOR_ADDRESS], 
       [2,1,1],
       [6,18,8]);
+
+  //Replace the 3 markets on Comptroller
   console.log("Replacing comptroller markets");
-  await comptroller._replaceMarket(new_pUSDC.address, c.BRICKED_PUSDC_ADDRESS, c.PUSDC_ACCOUNTS);
-  await comptroller._replaceMarket(new_pETH.address, c.BRICKED_PETH_ADDRESS, c.PETH_ACCOUNTS);
-  await comptroller._replaceMarket(new_pWBTC.address, c.BRICKED_PWBTC_ADDRESS, c.PWBTC_ACCOUNTS);
+  await comptroller._replaceMarket(new_pUSDC.address, c.BRICKED_PUSDC_ADDRESS, c.PUSDC_ACCOUNTS);         //Tx 7
+  await comptroller._replaceMarket(new_pETH.address, c.BRICKED_PETH_ADDRESS, c.PETH_ACCOUNTS);            //Tx 8
+  await comptroller._replaceMarket(new_pWBTC.address, c.BRICKED_PWBTC_ADDRESS, c.PWBTC_ACCOUNTS);         //Tx 9
   console.log("Markets replaced");
   usdcMegaHolderSigner = await impersonateAccount("0xBE0eB53F46cd790Cd13851d5EFf43D12404d33E8") // just an account with a lot of usdc (binance in this case)
   usdc = await ethers.getContractAt(USDC_ABI, c.USDC_ADDRESS)
