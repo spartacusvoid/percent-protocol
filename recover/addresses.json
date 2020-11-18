@@ -33,6 +33,14 @@
       { "name" : "pTUSD", "address": "0x290052F9074D64F06D4740F42C48168151BFB938" },
       { "name" : "pBUSD", "address": "0x1136568622c6fb3B768385C98167B2A0B27658ab" }
     ],
+    "interestRateModels" : {
+      "Stable1" : "0x60a5d5a4499f227ee75f82946e3146b6a55531ee",
+      "Stable2" : "0xcf6c862109e07ca961c8aaccf99200a414c07d70",
+      "ETH" : "0xa4a5a4e04e0dfe6c792b3b8a71e818e263ed8678",
+      "wBTC" : "0x1f6d784f1001d9d406031869919a076c23bc210a",
+      "Other1" : "0xf6d5fb3f34e34dc64c339b0803cc9e741da00a11",
+      "Other2" : "0x2c2a712308b27a17607407d3f580b4ba571261e3"
+    },
     "wbtcAccounts" : [
       "0x87616fA850c87a78f307878f32D808dad8f4d401"
     ],

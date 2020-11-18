@@ -44,7 +44,7 @@ before(async function () {
   await deployments.fixture();
   
   //Phase C
-  
+
   console.log("Changing implementation");
   //Transfer unitroller to new implementation
   const comptrollerReplacement = await ethers.getContract('InsolventComptroller');
@@ -83,16 +83,16 @@ before(async function () {
 });
 
 describe('Deployment', function () {
-  it('pUSDC should have the correct reserve factor', async function () {
+  it('Should have the correct reserve factors', async function () {
     expect(await new_pUSDC.reserveFactorMantissa() / 1e18).to.equal(await old_pUSDC.reserveFactorMantissa() / 1e18);
-  });
-
-  it('pWBTC should have the correct reserve factor', async function () {
     expect(await new_pWBTC.reserveFactorMantissa() / 1e18).to.equal(await old_pWBTC.reserveFactorMantissa() / 1e18);
+    expect(await old_pETH.reserveFactorMantissa() / 1e18).to.equal(await new_pETH.reserveFactorMantissa() / 1e18);
   });
 
-  it('pETH should have the correct reserve factor', async function () {
-    expect(await old_pETH.reserveFactorMantissa() / 1e18).to.equal(await new_pETH.reserveFactorMantissa() / 1e18);
+  it('Should call accrueInterest', async function () {
+    await new_pETH.accrueInterest();
+    await new_pUSDC.accrueInterest();
+    await new_pWBTC.accrueInterest();
   });
 
   it("Can replace ETH market in comptroller", async function(){  

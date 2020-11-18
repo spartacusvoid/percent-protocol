@@ -6,7 +6,8 @@ import { BigNumber } from "@ethersproject/bignumber";
 import * as c from "../recover/constants";
 
 const deployCErc20 = async (hre : HardhatRuntimeEnvironment, 
-        underlying: string, name: string, symbol: string) => {
+        underlying: string, name: string, symbol: string,
+        intreestRateModel : string) => {
     const {deployments, getNamedAccounts} = hre;
     const {deploy} = deployments;  
     const {deployer} = await getNamedAccounts();
@@ -22,7 +23,7 @@ const deployCErc20 = async (hre : HardhatRuntimeEnvironment,
         args: [ 
             underlying,                          // underlying_
             c.UNITROLLER_ADDRESS,                  // comptroller_
-            c.INTEREST_RATE_MODEL_ADDRESS,         // interestRateModel_
+            intreestRateModel,         // interestRateModel_
             c.INITIAL_EXCHANGE_RATE_MANTISSA,      // initialExchangeRateMantissa_
             name,                                // name_
             symbol,                              // symbol_
@@ -45,7 +46,7 @@ const deployCEther = async (hre : HardhatRuntimeEnvironment,
         contract: 'InsolventCEther',
         args: [ 
             c.UNITROLLER_ADDRESS, //comptroller_
-            "0xa4a5A4E04e0dFE6c792b3B8a71E818e263eD8678", //interestRateModel_ : WhitePaperModelV2Eth
+            c.INTEREST_RATE_MODELS.ETH, //interestRateModel_ 
             BigNumber.from("200388273633351366107209911"), //initialExchangeRateMantissa_
             name, //name_
             symbol, //symbol_
@@ -63,7 +64,7 @@ const deployComptroller = async (hre : HardhatRuntimeEnvironment) => {
     const {deployer} = await getNamedAccounts();   
     await deploy('InsolventComptroller', {
         from: deployer,
-        args: [],   
+        args: [], 
         log: true,
         deterministicDeployment: true,
     });
@@ -71,9 +72,11 @@ const deployComptroller = async (hre : HardhatRuntimeEnvironment) => {
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     await deployComptroller(hre);
-    await deployCErc20(hre, c.USDC_ADDRESS, "Percent USDC", "pUSDC");
+    await deployCErc20(hre, c.USDC_ADDRESS, "Percent USDC", "pUSDC",
+        c.INTEREST_RATE_MODELS.Stable1);
     await deployCEther(hre, "Percent Ether", "pETH");
-    await deployCErc20(hre, c.WBTC_ADDRESS, "Percent WBTC", "pWBTC");
+    await deployCErc20(hre, c.WBTC_ADDRESS, "Percent WBTC", "pWBTC",
+        c.INTEREST_RATE_MODELS.wBTC);
 };
 
 export default func;
