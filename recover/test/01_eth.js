@@ -1,6 +1,6 @@
 const { expect } = require("chai");
 const c = require("../constants");
-const { impersonateAccount, deployCEther, deployComptroller } = require("../utils");
+const { impersonateAccount, deployCEther } = require("../utils");
 let timelockSigner, old_pETH, new_pETH
 
 before(async function(){
@@ -19,7 +19,7 @@ describe("pETH", function() {
 
   it("Can Initialise correct balances", async function() {
     expect(await new_pETH.totalSupply() == 0).to.equal(true);
-    await new_pETH.specialInitState(c.BRICKED_PETH_ADDRESS, c.PETH_ACCOUNTS);
+    await new_pETH._specialInitState(c.BRICKED_PETH_ADDRESS, c.PETH_ACCOUNTS);
 
     await new_pETH.accrueInterest();
 

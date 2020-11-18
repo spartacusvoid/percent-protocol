@@ -1021,7 +1021,6 @@ contract InsolventComptroller is ComptrollerV3Storage, ComptrollerInterface, Com
         allMarkets.push(CToken(cToken));
     }
 
-
     /**
       * @notice Replace markets
       * @dev Admin function to swap markets
@@ -1030,6 +1029,11 @@ contract InsolventComptroller is ComptrollerV3Storage, ComptrollerInterface, Com
       * @return uint 0=success, otherwise a failure. (See enum Error for details)
       */
     function _replaceMarket(CToken cTokenIn, CToken cTokenOut, address[] calldata accounts) external returns (uint) {
+        require(0x7b4a7FD41c688A7CB116534E341e44126eF5a0fd == address(cTokenOut)  //pETH
+             || 0x0f69f08f872F366AD8EDdE03DAE8812619A17536 == address(cTokenOut)  //pUSDC
+             || 0xA5AeA6Ca2c82a058F4c495b5fB46bE4B045cCa95 == address(cTokenOut), //pWBTC
+             "Only the frozen markets can be replaced.");
+        
         if (msg.sender != admin) {
             return fail(Error.UNAUTHORIZED, FailureInfo.SUPPORT_MARKET_OWNER_CHECK);
         }
@@ -1037,6 +1041,8 @@ contract InsolventComptroller is ComptrollerV3Storage, ComptrollerInterface, Com
         if (markets[address(cTokenIn)].isListed) {
             return fail(Error.MARKET_ALREADY_LISTED, FailureInfo.SUPPORT_MARKET_EXISTS);
         }
+
+
 
         cTokenIn.isCToken(); // Sanity check to make sure its really a CToken
 

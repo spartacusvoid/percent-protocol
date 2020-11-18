@@ -19,7 +19,7 @@ describe("pWBTC", function() {
 
   it("Can Initialise correct balances", async function() {
     expect(await new_pWBTC.totalSupply() == 0).to.equal(true);
-    await new_pWBTC.specialInitState(c.BRICKED_PWBTC_ADDRESS, c.PWBTC_ACCOUNTS);
+    await new_pWBTC._specialInitState(c.BRICKED_PWBTC_ADDRESS, c.PWBTC_ACCOUNTS);
 
     await new_pWBTC.accrueInterest();
 

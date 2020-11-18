@@ -1,7 +1,9 @@
+const { expect } = require("chai");
 const hre = require("hardhat");
 const ethers = hre.ethers;
 const c = require("./constants");
 const { BigNumber } = ethers;
+const { Zero } = ethers.constants
 
 const impersonateAccount = async address => {
   const [account1] = await ethers.getSigners()
@@ -82,9 +84,45 @@ const deployComptroller = async (timelockSigner) => {
   return { comptroller, comptrollerReplacement };
 }
 
+async function repayUsdcLoan(account, usdc, usdcMegaHolderSigner, new_pUSDC){
+  const borrowed = await new_pUSDC.borrowBalanceStored(account);
+  if(borrowed.eq(Zero)) return
+  // send enough usdc to account so they can repay loan
+  await usdc.connect(usdcMegaHolderSigner).transfer(account, borrowed)
+  const signer = await impersonateAccount(account)
+  await usdc.connect(signer).approve(new_pUSDC.address, c.MAX_INT)
+  await new_pUSDC.connect(signer).repayBorrow(borrowed)
+  const finalBorrowBalance = await new_pUSDC.borrowBalanceStored(account)
+  expect(finalBorrowBalance / 1e18).to.be.closeTo(0, 0.001);
+}
+
+async function repayEthLoan(account, new_pETH){
+  const borrowed = await new_pETH.borrowBalanceStored(account);
+  if(borrowed.eq(Zero)) return
+  // send enough ETH to account so they can repay loan
+  const [account1] = await ethers.getSigners()
+  await account1.sendTransaction({to: account, value: borrowed});
+  const signer = await impersonateAccount(account)
+  await new_pETH.connect(signer).repayBorrow({ value : borrowed});
+  const finalBorrowBalance = await new_pETH.borrowBalanceStored(account)
+  expect(finalBorrowBalance / 1e18).to.be.closeTo(0, 0.001);
+}
+
+async function redeem(pToken, account){
+  const collat = await pToken.balanceOf(account);
+  if(collat.eq(Zero)) return;
+  const signer = await impersonateAccount(account);
+  await pToken.connect(signer).redeem(collat);
+  const collatAfter = await pToken.balanceOf(account);
+  console.log(`${account} collateral before: ${collat} after: ${collatAfter}`);
+}
+
 module.exports = {
   impersonateAccount,
   deployCErc20,
   deployCEther,
-  deployComptroller
+  deployComptroller,
+  repayEthLoan,
+  repayUsdcLoan,
+  redeem
 }
