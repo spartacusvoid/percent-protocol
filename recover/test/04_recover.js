@@ -1,13 +1,10 @@
-
 const { expect } = require("chai");
 const c = require("../constants");
 const abi = require("../abi");
-const addresses = require("../addresses.json");
 const { impersonateAccount, redeem, repayEthLoan, repayUsdcLoan } = require("../utils");
-const { deployments, ethers } = require("hardhat");
+const { ethers } = require("hardhat");
 const BigNumber = hre.ethers.BigNumber;
 const USDC_ABI = require("../usdc_abi.json");
-const { NEW_PWBTC_ADDRESS } = require("../constants");
 
 let timelockSigner, multiSigSigner,
     new_pUSDC, old_pUSDC, new_pETH, old_pETH, new_pWBTC, old_pWBTC,
@@ -38,30 +35,16 @@ before(async function () {
   await oldComptroller._setSeizePaused(true);
   await oldComptroller._setTransferPaused(true);
 
-  //Phase B
-
-  //Deploys Comptroller in deploy_script.ts
-  //Comptroller
-  await deployments.fixture();
-  
-  //Phase C
-
   console.log("Changing implementation");
   //Transfer unitroller to new implementation
-  const comptrollerReplacement = await ethers.getContract('InsolventComptroller');
-  await unitroller.connect(multiSigSigner)._setPendingImplementation(comptrollerReplacement.address);     //Tx 1
+  await unitroller.connect(multiSigSigner)._setPendingImplementation(c.NEW_COMPTROLLER_ADDRESS);    
+  const comptrollerReplacement = await ethers.getContractAt("InsolventComptroller", c.NEW_COMPTROLLER_ADDRESS);
   await comptrollerReplacement.connect(multiSigSigner)._become(c.UNITROLLER_ADDRESS);
-  comptroller = await ethers.getContractAt("InsolventComptroller", c.UNITROLLER_ADDRESS, multiSigSigner); //Tx 2
+  comptroller = await ethers.getContractAt("InsolventComptroller", c.UNITROLLER_ADDRESS, multiSigSigner);
 
   new_pUSDC = await ethers.getContractAt("InsolventCErc20", c.NEW_PUSDC_ADDRESS, multiSigSigner);
   new_pWBTC = await ethers.getContractAt("InsolventCErc20", c.NEW_PWBTC_ADDRESS, multiSigSigner);
-  new_pETH = await ethers.getContractAt('InsolventCEther', c.NEW_PETH_ADDRESS, multiSigSigner);
-
-  console.log("Initializing token state");
-  //Set reserve factors and apply the haircut
-  await new_pUSDC._specialInitState(c.BRICKED_PUSDC_ADDRESS, c.PUSDC_ACCOUNTS);                           //Tx 3
-  await new_pETH._specialInitState(c.BRICKED_PETH_ADDRESS, c.PETH_ACCOUNTS);                              //Tx 4
-  await new_pWBTC._specialInitState(c.BRICKED_PWBTC_ADDRESS, c.PWBTC_ACCOUNTS);                           //Tx 5
+  new_pETH = await ethers.getContractAt('InsolventCEther', c.NEW_PETH_ADDRESS, multiSigSigner);                   
 
   //Configure the price oracle for the 3 new tokens
   console.log("Setting Chainlink token configs");
