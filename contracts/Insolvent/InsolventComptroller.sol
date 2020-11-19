@@ -1042,8 +1042,6 @@ contract InsolventComptroller is ComptrollerV3Storage, ComptrollerInterface, Com
             return fail(Error.MARKET_ALREADY_LISTED, FailureInfo.SUPPORT_MARKET_EXISTS);
         }
 
-
-
         cTokenIn.isCToken(); // Sanity check to make sure its really a CToken
 
         Market storage marketOut = markets[address(cTokenOut)];

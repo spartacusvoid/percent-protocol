@@ -7,6 +7,7 @@ const { impersonateAccount, redeem, repayEthLoan, repayUsdcLoan } = require("../
 const { deployments, ethers } = require("hardhat");
 const BigNumber = hre.ethers.BigNumber;
 const USDC_ABI = require("../usdc_abi.json");
+const { NEW_PWBTC_ADDRESS } = require("../constants");
 
 let timelockSigner, multiSigSigner,
     new_pUSDC, old_pUSDC, new_pETH, old_pETH, new_pWBTC, old_pWBTC,
@@ -39,8 +40,8 @@ before(async function () {
 
   //Phase B
 
-  //Deploys the contracts in deploy_script.ts
-  //Comptroller, InsolventCEther, 2x InsolventCErc20Delegate, 2x InsolventCErc20Delegator
+  //Deploys Comptroller in deploy_script.ts
+  //Comptroller
   await deployments.fixture();
   
   //Phase C
@@ -52,11 +53,9 @@ before(async function () {
   await comptrollerReplacement.connect(multiSigSigner)._become(c.UNITROLLER_ADDRESS);
   comptroller = await ethers.getContractAt("InsolventComptroller", c.UNITROLLER_ADDRESS, multiSigSigner); //Tx 2
 
-  let new_pUSDC_address = (await ethers.getContract('pUSDC')).address
-  new_pUSDC = await ethers.getContractAt("InsolventCErc20", new_pUSDC_address, multiSigSigner);
-  let new_pWBTC_address = (await ethers.getContract('pWBTC')).address
-  new_pWBTC = await ethers.getContractAt("InsolventCErc20", new_pWBTC_address, multiSigSigner);
-  new_pETH = await ethers.getContract('pETH', multiSigSigner);
+  new_pUSDC = await ethers.getContractAt("InsolventCErc20", c.NEW_PUSDC_ADDRESS, multiSigSigner);
+  new_pWBTC = await ethers.getContractAt("InsolventCErc20", c.NEW_PWBTC_ADDRESS, multiSigSigner);
+  new_pETH = await ethers.getContractAt('InsolventCEther', c.NEW_PETH_ADDRESS, multiSigSigner);
 
   console.log("Initializing token state");
   //Set reserve factors and apply the haircut
@@ -73,9 +72,11 @@ before(async function () {
       [6,18,8]);
 
   //Replace the 3 markets on Comptroller
-  console.log("Replacing comptroller markets");
+  console.log("Replacing USDC market");
   await comptroller._replaceMarket(new_pUSDC.address, c.BRICKED_PUSDC_ADDRESS, c.PUSDC_ACCOUNTS);         //Tx 7
+  console.log("Replacing ETH market");
   await comptroller._replaceMarket(new_pETH.address, c.BRICKED_PETH_ADDRESS, c.PETH_ACCOUNTS);            //Tx 8
+  console.log("Replacing wBTC market");
   await comptroller._replaceMarket(new_pWBTC.address, c.BRICKED_PWBTC_ADDRESS, c.PWBTC_ACCOUNTS);         //Tx 9
   console.log("Markets replaced");
   usdcMegaHolderSigner = await impersonateAccount("0xBE0eB53F46cd790Cd13851d5EFf43D12404d33E8") // just an account with a lot of usdc (binance in this case)
@@ -127,39 +128,6 @@ describe('Deployment', function () {
       expect(await comptroller.mintGuardianPaused(new_pWBTC.address)).to.be.true;
       expect(await comptroller.borrowGuardianPaused(new_pWBTC.address)).to.be.true;
   });
-
-  it("YFI lender can be liquidated if they don't repay their USDC", async function() {
-        console.log("Close Factor", await comptroller.closeFactorMantissa() / 1e18);
-        console.log("Liquidation Incentive", await comptroller.liquidationIncentiveMantissa() / 1e18);
-        console.log("Seize Paused", await comptroller.seizeGuardianPaused());
-        const pDAI_address = addresses.workingTokens[1].address;
-        const pDAI = await hre.ethers.getContractAt(abi.CTOKEN_ABI, pDAI_address);
-        const daiSnapshot = await pDAI.getAccountSnapshot(addresses.yfiLender);
-        const Ten6 = (BigNumber.from("10")).pow(BigNumber.from("6"));
-        const Ten18 = (BigNumber.from("10")).pow(BigNumber.from("18"));
-        const daiBalance = daiSnapshot[1].mul(daiSnapshot[3]).div(Ten18);
-        console.log("yfiLender pDAI Balance", await pDAI.balanceOf(addresses.yfiLender) / 1e8);
-        console.log("yfiLender DAI Balance", daiBalance / 1e18);
-        const usdcEquivalent = daiBalance.mul(Ten6).div(Ten18);
-        const usdcSnapshot = await new_pUSDC.getAccountSnapshot(addresses.yfiLender);
-        const usdcBorrows = usdcSnapshot[2];
-        console.log("yfiLender USDC Borrows", usdcBorrows);
-        await comptroller._setSeizePaused(false);
-        console.log("Seize Paused", await comptroller.seizeGuardianPaused());
-        await usdc.connect(usdcMegaHolderSigner).approve(
-            new_pUSDC.address,
-            usdcBorrows
-        );
-        await new_pUSDC.connect(usdcMegaHolderSigner).liquidateBorrow(
-            addresses.yfiLender,
-            usdcEquivalent,
-            pDAI_address
-        );
-        const liqSnapshot = await pDAI.getAccountSnapshot("0xBE0eB53F46cd790Cd13851d5EFf43D12404d33E8");
-        const liqBalance = liqSnapshot[1].mul(liqSnapshot[3]).div(Ten18) / 1e18;
-        console.log(liqBalance);
-        expect(liqBalance).to.be.greaterThan(280000);
-    });
     
   it("USDC Repaid funds can be redeemed by suppliers", async function() {
       const totalUnderlyingStart = await usdc.balanceOf(new_pUSDC.address) / 1e6;
