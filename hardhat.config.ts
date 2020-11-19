@@ -1,6 +1,6 @@
 require('hardhat-deploy');
 require('hardhat-deploy-ethers');
-const {ALCHEMY_API_KEY} = require("./secret")
+const {ALCHEMY_API_KEY, INFURA_ID, VFAT_MULTISIG_PK} = require("./secret")
 
 /**
  * @type import('hardhat/config').HardhatUserConfig
@@ -12,7 +12,7 @@ module.exports = {
       allowUnlimitedContractSize: true,
       forking: {
         url: `https://eth-mainnet.alchemyapi.io/v2/${ALCHEMY_API_KEY}`,
-        blockNumber: 11254100
+        blockNumber: 11288000
       }
     }
   },

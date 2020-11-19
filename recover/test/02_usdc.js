@@ -1,7 +1,7 @@
 const { expect } = require("chai");
 const c = require("../constants");
-const { impersonateAccount, deployCErc20, deployComptroller } = require("../utils");
-let timelockSigner, new_pUSDC, old_pUSDC, comptroller, chainlinkPriceOracle
+const { impersonateAccount, deployCErc20 } = require("../utils");
+let timelockSigner, new_pUSDC, old_pUSDC, chainlinkPriceOracle
 
 before(async function(){
   timelockSigner = await impersonateAccount(c.TIMELOCK_ADDRESS)
