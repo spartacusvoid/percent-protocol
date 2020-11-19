@@ -14,14 +14,6 @@ module.exports = {
         url: `https://eth-mainnet.alchemyapi.io/v2/${ALCHEMY_API_KEY}`,
         blockNumber: 11288000
       }
-    },
-    kovan : {
-      url : `https://kovan.infura.io/v3/${INFURA_ID}`,
-      accounts: [`0x${VFAT_MULTISIG_PK}`]
-    },
-    mainnet : {
-      url : `https://mainnet.infura.io/v3/${INFURA_ID}`,
-      accounts: [`0x${VFAT_MULTISIG_PK}`]
     }
   },
   paths: {
