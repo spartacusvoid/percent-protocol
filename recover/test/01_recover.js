@@ -5,26 +5,27 @@ const { impersonateAccount } = require("../utils");
 const { ethers } = require("hardhat");
 const USDC_ABI = require("../usdc_abi.json");
 
-let multiSigSigner, comptroller, chainlinkPriceOracle,
-    new_pUSDC, new_pYFI, old_pUSDC, old_pYFI, timelockSigner
+let multiSigSigner, timelockSigner, vfatSigner, comptroller, chainlinkPriceOracle,
+    new_pUSDC, new_pYFI, old_pUSDC, old_pYFI
 
 before(async function () {
   multiSigSigner = await impersonateAccount(c.MULTISIG_ADDRESS);
   timelockSigner = await impersonateAccount(c.TIMELOCK_ADDRESS);
+  vfatSigner     = await impersonateAccount(c.VFAT_ADDRESS);
   await deployments.fixture();
 
   old_pUSDC = await hre.ethers.getContractAt("InsolventCErc20", c.NEW_PUSDC_ADDRESS);
-  old_pYFI = await hre.ethers.getContractAt("InsolventCErc20", c.OLD_PYFI_ADDRESS);
+  old_pYFI =  await hre.ethers.getContractAt("InsolventCErc20", c.OLD_PYFI_ADDRESS);
   old_pUSDT = await hre.ethers.getContractAt("InsolventCErc20", c.OLD_PUSDT_ADDRESS);
-  old_pDAI = await hre.ethers.getContractAt("InsolventCErc20", c.OLD_PDAI_ADDRESS);
+  old_pDAI =  await hre.ethers.getContractAt("InsolventCErc20", c.OLD_PDAI_ADDRESS);
 
-  new_pUSDC = await hre.ethers.getContract("pUSDC");
-  new_pYFI = await hre.ethers.getContract("pYFI");
-  new_pUSDT = await hre.ethers.getContract("pUSDT");
-  new_pDAI = await hre.ethers.getContract("pDAI");
+  new_pUSDC = await hre.ethers.getContractAt("InsolventCErc20", c.NEW_NEW_PUSDC_ADDRESS);
+  new_pYFI =  await hre.ethers.getContractAt("InsolventCErc20", c.NEW_PYFI_ADDRESS);
+  new_pUSDT = await hre.ethers.getContractAt("InsolventCErc20", c.NEW_PUSDT_ADDRESS);
+  new_pDAI =  await hre.ethers.getContractAt("InsolventCErc20", c.NEW_PDAI_ADDRESS);
 
   const unitroller = await ethers.getContractAt("Unitroller", c.UNITROLLER_ADDRESS, multiSigSigner);
-  const comptrollerReplacement = await ethers.getContract('InsolventComptroller2');
+  const comptrollerReplacement = await ethers.getContractAt('InsolventComptroller2', c.NEW_NEW_COMPTROLLER_ADDRESS, vfatSigner);
   await unitroller._setPendingImplementation(comptrollerReplacement.address); 
   await comptrollerReplacement.connect(multiSigSigner)._become(c.UNITROLLER_ADDRESS);
   comptroller = await ethers.getContractAt("InsolventComptroller2", c.UNITROLLER_ADDRESS, multiSigSigner); 
@@ -39,10 +40,10 @@ before(async function () {
       [6,18,6,18]);
 
   //Set reserve factors
-  await new_pYFI.connect(multiSigSigner)._setReserveFactor(await old_pYFI.reserveFactorMantissa());
+  await  new_pYFI.connect(multiSigSigner)._setReserveFactor(await  old_pYFI.reserveFactorMantissa());
   await new_pUSDC.connect(multiSigSigner)._setReserveFactor(await old_pUSDC.reserveFactorMantissa());
   await new_pUSDT.connect(multiSigSigner)._setReserveFactor(await old_pUSDT.reserveFactorMantissa());
-  await new_pDAI.connect(multiSigSigner)._setReserveFactor(await old_pDAI.reserveFactorMantissa());
+  await  new_pDAI.connect(multiSigSigner)._setReserveFactor(await  old_pDAI.reserveFactorMantissa());
 
   //Replace the 2 markets on Comptroller
   console.log("Replacing USDC market");
@@ -57,10 +58,10 @@ before(async function () {
 
 describe('Deployment', function () {
   it('Should have the correct reserve factors', async function () {
-    expect(await new_pYFI.reserveFactorMantissa() / 1e18).to.equal(await old_pYFI.reserveFactorMantissa() / 1e18);
+    expect(await  new_pYFI.reserveFactorMantissa() / 1e18).to.equal(await  old_pYFI.reserveFactorMantissa() / 1e18);
     expect(await new_pUSDC.reserveFactorMantissa() / 1e18).to.equal(await old_pUSDC.reserveFactorMantissa() / 1e18);
     expect(await new_pUSDT.reserveFactorMantissa() / 1e18).to.equal(await old_pUSDT.reserveFactorMantissa() / 1e18);
-    expect(await new_pDAI.reserveFactorMantissa() / 1e18).to.equal(await old_pDAI.reserveFactorMantissa() / 1e18);
+    expect(await  new_pDAI.reserveFactorMantissa() / 1e18).to.equal(await  old_pDAI.reserveFactorMantissa() / 1e18);
   });
 
   it('Should call accrueInterest', async function () {
