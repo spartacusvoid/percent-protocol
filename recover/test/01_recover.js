@@ -25,7 +25,9 @@ before(async function () {
   new_pDAI =  await hre.ethers.getContractAt("InsolventCErc20", c.NEW_PDAI_ADDRESS);
 
   const unitroller = await ethers.getContractAt("Unitroller", c.UNITROLLER_ADDRESS, multiSigSigner);
-  const comptrollerReplacement = await ethers.getContractAt('InsolventComptroller2', c.NEW_NEW_COMPTROLLER_ADDRESS, vfatSigner);
+  
+  const comptrollerReplacement = await ethers.getContract("InsolventComptroller2");
+  //const comptrollerReplacement = await ethers.getContractAt('InsolventComptroller2', c.NEW_NEW_COMPTROLLER_ADDRESS, vfatSigner);
   await unitroller._setPendingImplementation(comptrollerReplacement.address); 
   await comptrollerReplacement.connect(multiSigSigner)._become(c.UNITROLLER_ADDRESS);
   comptroller = await ethers.getContractAt("InsolventComptroller2", c.UNITROLLER_ADDRESS, multiSigSigner); 
@@ -47,13 +49,13 @@ before(async function () {
 
   //Replace the 2 markets on Comptroller
   console.log("Replacing USDC market");
-  await comptroller._replaceMarket(new_pUSDC.address, old_pUSDC.address); 
+  await comptroller._replaceMarket(new_pUSDC.address, old_pUSDC.address, c.PUSDC_ACCOUNTS); 
   console.log("Replacing YFI market");
-  await comptroller._replaceMarket(new_pYFI.address, old_pYFI.address);
+  await comptroller._replaceMarket(new_pYFI.address, old_pYFI.address, c.PYFI_ACCOUNTS);
   console.log("Replacing USDT market");
-  await comptroller._replaceMarket(new_pUSDT.address, old_pUSDT.address);
+  await comptroller._replaceMarket(new_pUSDT.address, old_pUSDT.address, c.PUSDT_ACCOUNTS);
   console.log("Replacing DAI market");
-  await comptroller._replaceMarket(new_pDAI.address, old_pDAI.address);
+  await comptroller._replaceMarket(new_pDAI.address, old_pDAI.address, c.PDAI_ACCOUNTS);
 });
 
 describe('Deployment', function () {
@@ -169,5 +171,19 @@ describe('Deployment', function () {
       expect(usdtPrice / 1e30).to.be.closeTo(1, 0.05, "USDT");
       expect(daiPrice / 1e18).to.be.closeTo(1, 0.05, "DAI");
       expect(yfiPrice / 1e18).to.be.within(10000, 50000, "YFI");
+  });
+
+  it("Account 0xD9B99266C42d427Bb3A64f30a0242bbEb41F6830 should not have the old markets", async function() {
+    const assetsIn = await comptroller.getAssetsIn("0xD9B99266C42d427Bb3A64f30a0242bbEb41F6830");
+    expect(assetsIn).to.not.include(c.NEW_PUSDC_ADDRESS);
+    expect(assetsIn).to.not.include(c.OLD_PYFI_ADDRESS);
+    expect(assetsIn).to.not.include(c.OLD_PYFI_ADDRESS);
+  });
+
+  it("There are no insolvent accounts after swapping the markets", async function() {
+    for (const a of c.PUSDC_ACCOUNTS) {
+      const snapshot = await comptroller.getAccountLiquidity(a);
+      expect(snapshot[2] / 1e18).to.be.lessThan(101); //highest debt will be 100.x
+    }
   })
 });

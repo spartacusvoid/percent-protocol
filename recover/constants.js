@@ -1,7 +1,9 @@
 const hre = require("hardhat");
 const ethers = hre.ethers;
 const { BigNumber } = ethers;
-const { ethAccounts, usdcAccounts, wbtcAccounts, interestRateModels } = require("./addresses")
+const { ethAccounts, usdcAccounts, wbtcAccounts, 
+        usdtAccounts, daiAccounts, yfiAccounts, 
+        interestRateModels } = require("./addresses")
 
 module.exports = {
   HAIRCUT_FACTOR: BigNumber.from("7235"),
@@ -26,6 +28,9 @@ module.exports = {
   PETH_ACCOUNTS: ethAccounts,
   PUSDC_ACCOUNTS: usdcAccounts,
   PWBTC_ACCOUNTS: wbtcAccounts,
+  PUSDT_ACCOUNTS: usdtAccounts,
+  PDAI_ACCOUNTS: daiAccounts,
+  PYFI_ACCOUNTS: yfiAccounts,
   BRICKED_PUSDC_ADDRESS: "0x0f69f08f872f366ad8edde03dae8812619a17536",
   BRICKED_PETH_ADDRESS: "0x7b4a7FD41c688A7CB116534E341e44126eF5a0fd",
   BRICKED_PWBTC_ADDRESS: "0xA5AeA6Ca2c82a058F4c495b5fB46bE4B045cCa95",

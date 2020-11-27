@@ -3415,6 +3415,7 @@ contract InsolventComptroller2 is ComptrollerV3Storage, ComptrollerInterface, Co
      * @return Whether or not the account successfully exited the market
      */
     function exitMarket(address cTokenAddress) external returns (uint) {
+        //Removed to make space for _replaceMarket
         return uint(Error.NO_ERROR);
     }
 
@@ -4222,7 +4223,7 @@ contract InsolventComptroller2 is ComptrollerV3Storage, ComptrollerInterface, Co
       * @param cTokenOut The address of the market (token) to replace
       * @return uint 0=success, otherwise a failure. (See enum Error for details)
       */
-    function _replaceMarket(CToken cTokenIn, CToken cTokenOut) external returns (uint) {
+    function _replaceMarket(CToken cTokenIn, CToken cTokenOut, address[] calldata accounts) external returns (uint) {
         require(0xF5D1F052a33321d78F12CEa58d869c59672BF444 == address(cTokenOut)  //pUSDC
              || 0x1890f366B08eBd23320758B741B5aA1359eF6F22 == address(cTokenOut)  //pYFI
              || 0x2404987433ff32e32c5b0F8Fb77A74a5BcA44aCb == address(cTokenOut)  //pUSDT
@@ -4245,7 +4246,7 @@ contract InsolventComptroller2 is ComptrollerV3Storage, ComptrollerInterface, Co
             return fail(Error.MARKET_NOT_LISTED, FailureInfo.SUPPORT_MARKET_EXISTS);
         }
 
-        markets[address(cTokenIn)] = Market({
+        Market storage marketIn = markets[address(cTokenIn)] = Market({
           isListed: true,
           isComped: markets[address(cTokenOut)].isComped,
           collateralFactorMantissa: markets[address(cTokenOut)].collateralFactorMantissa
@@ -4258,6 +4259,18 @@ contract InsolventComptroller2 is ComptrollerV3Storage, ComptrollerInterface, Co
             if(allMarkets[i] == cTokenOut){
                 marketOutIdx = i;
                 set = true;
+            }
+        }        
+        
+        // replace in accountAssets for each account
+        for (uint i=0;i<accounts.length;i++){
+            if(marketOut.accountMembership[accounts[i]]){                       // check membership
+                /* addToMarketInternal(cTokenIn, accounts[i]); */               // using this doesn't work because it appends to accountAssets
+                marketIn.accountMembership[accounts[i]] = true;
+            }
+            for (uint j=0;j<accountAssets[accounts[i]].length;j++){
+                if(accountAssets[accounts[i]][j] == cTokenOut)
+                    accountAssets[accounts[i]][j] = cTokenIn;
             }
         }
 
