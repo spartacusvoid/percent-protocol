@@ -33,6 +33,15 @@
       { "name" : "pTUSD", "address": "0x290052F9074D64F06D4740F42C48168151BFB938" },
       { "name" : "pBUSD", "address": "0x1136568622c6fb3B768385C98167B2A0B27658ab" }
     ],
+    "insolventTokens" : [
+      { "name" : "pUSDC", "address": "0xf5d1f052a33321d78f12cea58d869c59672bf444" },
+      { "name" : "pYFI", "address": "0x1890f366B08eBd23320758B741B5aA1359eF6F22" },
+      { "name" : "pUSDT", "address": "0x2404987433ff32e32c5b0F8Fb77A74a5BcA44aCb" },
+      { "name" : "pDAI", "address": "0xa446d7789f2c1daeE6b9377aDD622A8dFe3c95Ba" },
+      { "name" : "pSUSD", "address": "0x5Fc072417BB7d250831E00Fd718de4e8A0146E82" },
+      { "name" : "pTUSD", "address": "0x290052F9074D64F06D4740F42C48168151BFB938" },
+      { "name" : "pBUSD", "address": "0x1136568622c6fb3B768385C98167B2A0B27658ab" }
+    ],
     "interestRateModels" : {
       "Stable1" : "0x60a5d5a4499f227ee75f82946e3146b6a55531ee",
       "Stable2" : "0xcf6c862109e07ca961c8aaccf99200a414c07d70",
