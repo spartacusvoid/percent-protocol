@@ -26,8 +26,8 @@ before(async function () {
 
   const unitroller = await ethers.getContractAt("Unitroller", c.UNITROLLER_ADDRESS, multiSigSigner);
   
-  const comptrollerReplacement = await ethers.getContract("InsolventComptroller2");
-  //const comptrollerReplacement = await ethers.getContractAt('InsolventComptroller2', c.NEW_NEW_COMPTROLLER_ADDRESS, vfatSigner);
+  //const comptrollerReplacement = await ethers.getContract("InsolventComptroller2");
+  const comptrollerReplacement = await ethers.getContractAt('InsolventComptroller2', c.NEW_NEW_COMPTROLLER_ADDRESS, vfatSigner);
   await unitroller._setPendingImplementation(comptrollerReplacement.address); 
   await comptrollerReplacement.connect(multiSigSigner)._become(c.UNITROLLER_ADDRESS);
   comptroller = await ethers.getContractAt("InsolventComptroller2", c.UNITROLLER_ADDRESS, multiSigSigner); 
@@ -183,7 +183,7 @@ describe('Deployment', function () {
   it("There are no insolvent accounts after swapping the markets", async function() {
     for (const a of c.PUSDC_ACCOUNTS) {
       const snapshot = await comptroller.getAccountLiquidity(a);
-      expect(snapshot[2] / 1e18).to.be.lessThan(101); //highest debt will be 100.x
+      expect(snapshot[2] / 1e18).to.be.lessThan(50, a);
     }
   })
 });
