@@ -13,7 +13,7 @@ module.exports = {
       allowUnlimitedContractSize: true,
       forking: {
         url: NODE_URL,
-        blockNumber: 11343510
+        blockNumber: 11366325
       }
     },
     mainnet: {

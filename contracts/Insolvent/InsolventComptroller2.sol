@@ -1032,6 +1032,7 @@ contract InsolventComptroller2 is ComptrollerV3Storage, ComptrollerInterface, Co
         require(0xF5D1F052a33321d78F12CEa58d869c59672BF444 == address(cTokenOut)  //pUSDC
              || 0x1890f366B08eBd23320758B741B5aA1359eF6F22 == address(cTokenOut)  //pYFI
              || 0x2404987433ff32e32c5b0F8Fb77A74a5BcA44aCb == address(cTokenOut)  //pUSDT
+             || 0x290052F9074D64F06D4740F42C48168151BFB938 == address(cTokenOut)  //pTUSD
              || 0xa446d7789f2c1daeE6b9377aDD622A8dFe3c95Ba == address(cTokenOut), //pDAI
              "Only the insolvent markets can be replaced.");
         

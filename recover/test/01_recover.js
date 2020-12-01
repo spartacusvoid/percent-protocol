@@ -6,7 +6,8 @@ const { ethers } = require("hardhat");
 const USDC_ABI = require("../usdc_abi.json");
 
 let multiSigSigner, timelockSigner, vfatSigner, comptroller, chainlinkPriceOracle,
-    new_pUSDC, new_pYFI, old_pUSDC, old_pYFI
+    new_pUSDC, new_pYFI, old_pUSDC, old_pYFI, new_pTUSD, old_pTUSD, new_pDAI, old_pDAI,
+    new_pUSDT, old_pUSDT
 
 before(async function () {
   multiSigSigner = await impersonateAccount(c.MULTISIG_ADDRESS);
@@ -18,11 +19,13 @@ before(async function () {
   old_pYFI =  await hre.ethers.getContractAt("InsolventCErc20", c.OLD_PYFI_ADDRESS);
   old_pUSDT = await hre.ethers.getContractAt("InsolventCErc20", c.OLD_PUSDT_ADDRESS);
   old_pDAI =  await hre.ethers.getContractAt("InsolventCErc20", c.OLD_PDAI_ADDRESS);
+  old_pTUSD =  await hre.ethers.getContractAt("InsolventCErc20", c.OLD_PTUSD_ADDRESS);
 
   new_pUSDC = await hre.ethers.getContractAt("InsolventCErc20", c.NEW_NEW_PUSDC_ADDRESS);
   new_pYFI =  await hre.ethers.getContractAt("InsolventCErc20", c.NEW_PYFI_ADDRESS);
   new_pUSDT = await hre.ethers.getContractAt("InsolventCErc20", c.NEW_PUSDT_ADDRESS);
   new_pDAI =  await hre.ethers.getContractAt("InsolventCErc20", c.NEW_PDAI_ADDRESS);
+  new_pTUSD =  await hre.ethers.getContractAt("InsolventCErc20", c.NEW_PTUSD_ADDRESS);
 
   const unitroller = await ethers.getContractAt("Unitroller", c.UNITROLLER_ADDRESS, multiSigSigner);
   
@@ -36,16 +39,16 @@ before(async function () {
   //Configure the price oracle for the 2 new tokens
   console.log("Setting Chainlink token configs");
   await chainlinkPriceOracle.connect(timelockSigner).setTokenConfigs(                                   
-      [new_pUSDC.address, new_pYFI.address, new_pUSDT.address, new_pDAI.address], 
-      [c.USDC_CHAINLINK_AGGREGATOR_ADDRESS, c.YFI_CHAINLINK_AGGREGATOR_ADDRESS, c.USDT_CHAINLINK_AGGREGATOR_ADDRESS, c.DAI_CHAINLINK_AGGREGATOR_ADDRESS], 
-      [2,2,2,1],
-      [6,18,6,18]);
+      [new_pUSDC.address, new_pYFI.address, new_pUSDT.address, new_pDAI.address, new_pTUSD.address], 
+      [c.USDC_CHAINLINK_AGGREGATOR_ADDRESS, c.YFI_CHAINLINK_AGGREGATOR_ADDRESS, 
+       c.USDT_CHAINLINK_AGGREGATOR_ADDRESS, c.DAI_CHAINLINK_AGGREGATOR_ADDRESS,
+       c.TUSD_CHAINLINK_AGGREGATOR_ADDRESS
+       ], 
+      [2,2,2,1,2],
+      [6,18,6,18,18]);
 
   //Set reserve factors
-  await  new_pYFI.connect(multiSigSigner)._setReserveFactor(await  old_pYFI.reserveFactorMantissa());
-  await new_pUSDC.connect(multiSigSigner)._setReserveFactor(await old_pUSDC.reserveFactorMantissa());
-  await new_pUSDT.connect(multiSigSigner)._setReserveFactor(await old_pUSDT.reserveFactorMantissa());
-  await  new_pDAI.connect(multiSigSigner)._setReserveFactor(await  old_pDAI.reserveFactorMantissa());
+  await  new_pTUSD.connect(multiSigSigner)._setReserveFactor(await old_pTUSD.reserveFactorMantissa());
 
   //Replace the 2 markets on Comptroller
   console.log("Replacing USDC market");
@@ -56,6 +59,8 @@ before(async function () {
   await comptroller._replaceMarket(new_pUSDT.address, old_pUSDT.address, c.PUSDT_ACCOUNTS);
   console.log("Replacing DAI market");
   await comptroller._replaceMarket(new_pDAI.address, old_pDAI.address, c.PDAI_ACCOUNTS);
+  console.log("Replacing TUSD market");
+  await comptroller._replaceMarket(new_pTUSD.address, old_pTUSD.address, c.PTUSD_ACCOUNTS);
 });
 
 describe('Deployment', function () {
@@ -64,6 +69,7 @@ describe('Deployment', function () {
     expect(await new_pUSDC.reserveFactorMantissa() / 1e18).to.equal(await old_pUSDC.reserveFactorMantissa() / 1e18);
     expect(await new_pUSDT.reserveFactorMantissa() / 1e18).to.equal(await old_pUSDT.reserveFactorMantissa() / 1e18);
     expect(await  new_pDAI.reserveFactorMantissa() / 1e18).to.equal(await  old_pDAI.reserveFactorMantissa() / 1e18);
+    expect(await new_pTUSD.reserveFactorMantissa() / 1e18).to.equal(await old_pTUSD.reserveFactorMantissa() / 1e18);
   });
 
   it('Should call accrueInterest', async function () {
@@ -71,6 +77,7 @@ describe('Deployment', function () {
     await new_pYFI.accrueInterest();
     await new_pUSDT.accrueInterest();
     await new_pDAI.accrueInterest();
+    await new_pTUSD.accrueInterest();
   });
 
   it("Can replace YFI market in comptroller", async function(){  
@@ -117,6 +124,17 @@ describe('Deployment', function () {
       expect(await comptroller.borrowGuardianPaused(new_pDAI.address)).to.be.true;
   });
 
+  it("Can replace TUSD market in comptroller", async function(){
+      const newMarket = await comptroller.markets(new_pTUSD.address);
+      const oldMarket = await comptroller.markets(old_pTUSD.address);
+
+      expect(newMarket.isListed).to.be.true;
+      expect(oldMarket.isListed).to.be.false;
+
+      expect(await comptroller.mintGuardianPaused(new_pTUSD.address)).to.be.true;
+      expect(await comptroller.borrowGuardianPaused(new_pTUSD.address)).to.be.true;
+  });
+
   it("New YFI has no balance, no supply and no borrows", async function() {
       const underlyingAddress = await new_pYFI.underlying();
       const underlying = await ethers.getContractAt(USDC_ABI, underlyingAddress);
@@ -161,15 +179,28 @@ describe('Deployment', function () {
       expect(totalBorrows).to.equal(0);
   });
 
+  it("New TUSD has no balance, no supply and no borrows", async function() {
+      const underlyingAddress = await new_pTUSD.underlying();
+      const underlying = await ethers.getContractAt(USDC_ABI, underlyingAddress);
+      const totalUnderlyingStart = await underlying.balanceOf(new_pTUSD.address) / 1e8;
+      expect(totalUnderlyingStart).to.equal(0);
+      const totalSupply = await new_pTUSD.totalSupply() / 1e8;
+      expect(totalSupply).to.equal(0);
+      const totalBorrows = await new_pTUSD.totalBorrows() / 1e8;
+      expect(totalBorrows).to.equal(0);
+  });
+
   it("Can retrieve prices for the new assets", async function() {
       const usdcPrice = await chainlinkPriceOracle.getUnderlyingPrice(new_pUSDC.address);
       const yfiPrice = await chainlinkPriceOracle.getUnderlyingPrice(new_pYFI.address);
       const usdtPrice = await chainlinkPriceOracle.getUnderlyingPrice(new_pUSDT.address);
       const daiPrice = await chainlinkPriceOracle.getUnderlyingPrice(new_pDAI.address);
+      const tusdPrice = await chainlinkPriceOracle.getUnderlyingPrice(new_pTUSD.address);
       //Mantissa = 36 - decimals, USDC and USDT have 6 decimals, DAI and YFI have 18
       expect(usdcPrice / 1e30).to.be.closeTo(1, 0.05, "USDC");
       expect(usdtPrice / 1e30).to.be.closeTo(1, 0.05, "USDT");
       expect(daiPrice / 1e18).to.be.closeTo(1, 0.05, "DAI");
+      expect(tusdPrice / 1e18).to.be.closeTo(1, 0.05, "TUSD");
       expect(yfiPrice / 1e18).to.be.within(10000, 50000, "YFI");
   });
 
