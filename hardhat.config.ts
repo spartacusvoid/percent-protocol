@@ -1,6 +1,7 @@
 require('hardhat-deploy');
 require('hardhat-deploy-ethers');
-const {ALCHEMY_API_KEY, INFURA_ID, VFAT_MULTISIG_PK} = require("./secret")
+require("@nomiclabs/hardhat-etherscan");
+const {NODE_URL,ETHERSCAN_API_KEY,VFAT_MULTISIG_PK} = require("./secret")
 
 /**
  * @type import('hardhat/config').HardhatUserConfig
@@ -11,9 +12,13 @@ module.exports = {
     hardhat: {
       allowUnlimitedContractSize: true,
       forking: {
-        url: `https://eth-mainnet.alchemyapi.io/v2/${ALCHEMY_API_KEY}`,
-        blockNumber: 11295510
+        url: NODE_URL,
+        blockNumber: 11366325
       }
+    },
+    mainnet: {
+      url: NODE_URL,
+      accounts: [VFAT_MULTISIG_PK]
     }
   },
   paths: {
@@ -27,5 +32,8 @@ module.exports = {
   },
   mocha: {
     timeout: 60000
+  },
+  etherscan : {
+    apiKey : ETHERSCAN_API_KEY
   }
 };

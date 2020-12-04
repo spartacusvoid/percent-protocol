@@ -19,6 +19,7 @@
   "license": "UNLICENSED",
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.0.0",
+    "@nomiclabs/hardhat-etherscan": "^2.0.1",
     "bignumber.js": "8.0.1",
     "ethers": "^5.0.19",
     "hardhat": "^2.0.2",

@@ -33,6 +33,15 @@
       { "name" : "pTUSD", "address": "0x290052F9074D64F06D4740F42C48168151BFB938" },
       { "name" : "pBUSD", "address": "0x1136568622c6fb3B768385C98167B2A0B27658ab" }
     ],
+    "insolventTokens" : [
+      { "name" : "pUSDC", "address": "0xf5d1f052a33321d78f12cea58d869c59672bf444" },
+      { "name" : "pYFI", "address": "0x1890f366B08eBd23320758B741B5aA1359eF6F22" },
+      { "name" : "pUSDT", "address": "0x2404987433ff32e32c5b0F8Fb77A74a5BcA44aCb" },
+      { "name" : "pDAI", "address": "0xa446d7789f2c1daeE6b9377aDD622A8dFe3c95Ba" },
+      { "name" : "pSUSD", "address": "0x5Fc072417BB7d250831E00Fd718de4e8A0146E82" },
+      { "name" : "pTUSD", "address": "0x290052F9074D64F06D4740F42C48168151BFB938" },
+      { "name" : "pBUSD", "address": "0x1136568622c6fb3B768385C98167B2A0B27658ab" }
+    ],
     "interestRateModels" : {
       "Stable1" : "0x60a5d5a4499f227ee75f82946e3146b6a55531ee",
       "Stable2" : "0xcf6c862109e07ca961c8aaccf99200a414c07d70",
@@ -127,5 +136,39 @@
       "0x4299D864BBDa0FE3272da750F8F7E8757A8ef534",
       "0x87616fA850c87a78f307878f32D808dad8f4d401",
       "0x3Ee505bA316879d246a8fD2b3d7eE63b51B44FAB"
+    ],
+    "daiAccounts" : [
+      "0x3506Bf74E94c49b907f0F2DF896d5d669F7bC146",
+      "0xA4f2b2557D78E31D48E1ffa8AF8b25Db8524Ea3c",
+      "0xcb0b279369b3c00bb01f73470c333462a39e6aee",
+      "0xda248cC10b477C1144219183EC87b0621DAC37b3",
+      "0x87616fA850c87a78f307878f32D808dad8f4d401"
+    ],
+    "usdtAccounts" : [
+      "0x0c0d0c25cf5a6539c8dc62c9ae111f1e5ee6ec4b",
+      "0x3506Bf74E94c49b907f0F2DF896d5d669F7bC146",
+      "0xAA98c7aFABbC0EA3aCdc029A9D71b9Ac83fF8cef",
+      "0xFb626333099A91Ab677BCd5e9C71bc4Dbe0238a8",
+      "0xd74b12a60df20fe9c70946ee3e263db321511b7f",
+      "0x493374100e511b1b091fa5bace1929dc154fee80",
+      "0xcb0b279369b3c00bb01f73470c333462a39e6aee",
+      "0x87616fA850c87a78f307878f32D808dad8f4d401",
+      "0xe1ad30971b83c17e2a24c0334cb45f808abebc87"
+    ],
+    "yfiAccounts" : [
+      "0x3506Bf74E94c49b907f0F2DF896d5d669F7bC146",
+      "0xD9B99266C42d427Bb3A64f30a0242bbEb41F6830",
+      "0x82020EAA71389c1d5855de78e2ab52c090327f2e",
+      "0xA4f2b2557D78E31D48E1ffa8AF8b25Db8524Ea3c",
+      "0x08Fc3eFd10a7003729FE5D69521757472511b1A0",
+      "0xda248cC10b477C1144219183EC87b0621DAC37b3",
+      "0xF92660595bBf1C76071f262e186bd2182815c613",
+      "0x3Ee505bA316879d246a8fD2b3d7eE63b51B44FAB"
+    ],
+    "tusdAccounts" : [
+      "0x3506Bf74E94c49b907f0F2DF896d5d669F7bC146",
+      "0xAA98c7aFABbC0EA3aCdc029A9D71b9Ac83fF8cef",
+      "0xF92660595bBf1C76071f262e186bd2182815c613",
+      "0xF85385347F56819C316939434d427d0c9537EDdc"
     ]
   }
